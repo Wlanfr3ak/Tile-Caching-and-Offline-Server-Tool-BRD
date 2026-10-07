@@ -332,25 +332,27 @@ class TileHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            tile_match = TILE_PATTERN.match(self.path)
+            # Query-String (z. B. ?v=<version> als Cache-Buster) ignorieren
+            path = urlparse(self.path).path
+            tile_match = TILE_PATTERN.match(path)
             if tile_match:
                 layer, z, x, y = tile_match.group(1), int(tile_match.group(2)), int(tile_match.group(3)), int(tile_match.group(4))
                 return self.serve_tile(layer, z, x, y)
 
-            if self.path == '/version':
+            if path == '/version':
                 return self.send_json({'version': VERSION})
 
-            if self.path == '/stats':
+            if path == '/stats':
                 return self.serve_stats()
 
-            if self.path.startswith('/missing'):
+            if path.startswith('/missing'):
                 return self.serve_missing()
 
-            if self.path.startswith('/next-missing'):
+            if path.startswith('/next-missing'):
                 return self.serve_next_missing()
 
-            if self.path in ('/', '/index.html'):
-                self.path = '/index.html'
+            if path in ('/', '/index.html'):
+                return self.serve_index()
 
             return super().do_GET()
         except ConnectionError:
@@ -423,6 +425,23 @@ class TileHandler(http.server.SimpleHTTPRequestHandler):
             f.write(data)
 
         self.send_png(data, cached=False)
+
+    def serve_index(self):
+        """index.html mit eingesetzter Server-Version (Cache-Buster fürs
+        Frontend) ausliefern. Immer frisch -> 'no-cache'."""
+        try:
+            with open(os.path.join(ROOT, 'index.html'), 'rb') as f:
+                body = f.read().replace(b'__TILE_SERVER_VERSION__',
+                                        VERSION.encode('ascii'))
+        except OSError:
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def serve_stats(self):
         result = {}
@@ -515,7 +534,7 @@ class TileHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_HEAD(self):
         try:
-            tile_match = TILE_PATTERN.match(self.path)
+            tile_match = TILE_PATTERN.match(urlparse(self.path).path)
             if tile_match:
                 layer, z, x, y = tile_match.group(1), int(tile_match.group(2)), int(tile_match.group(3)), int(tile_match.group(4))
                 return self.serve_tile_head(layer, z, x, y)

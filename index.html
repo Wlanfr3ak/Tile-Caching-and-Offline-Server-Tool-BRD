@@ -162,6 +162,12 @@
     };
     const COVERAGE_BBOX = [51.2, 6.5, 55.3, 14.6];
 
+    // Server-Version (vom Server in index.html eingesetzt) als Cache-Buster:
+    // neue Version -> neue Tile-URLs -> der Browser lädt wirklich neu statt
+    // evtl. lang gecachte (fehlerhafte) Kacheln wiederzuverwenden.
+    const TILE_V = '__TILE_SERVER_VERSION__';
+    const tileURL = (layer, z, x, y) => `/tiles/${layer}/${z}/${x}/${y}.png?v=${TILE_V}`;
+
     const ATTR_SH = '&copy; <a href="https://opendata.schleswig-holstein.de">GeoBasis-DE/LVermGeo SH/CC BY 4.0</a>';
     const ATTR_NI = '&copy; <a href="https://www.lgln.niedersachsen.de">LGLN</a> / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
     const ATTR_HH = '&copy; Freie und Hansestadt Hamburg, LGV / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
@@ -274,7 +280,7 @@
 
     const leafletLayers = {};
     LAYER_DEFS.forEach(def => {
-      leafletLayers[def.id] = new FallbackTileLayer(`/tiles/${def.id}/{z}/{x}/{y}.png`, {
+      leafletLayers[def.id] = new FallbackTileLayer(tileURL(def.id, '{z}', '{x}', '{y}'), {
         maxZoom: def.max,
         maxNativeZoom: def.maxNative,
         attribution: def.attribution
@@ -711,7 +717,7 @@ GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
           const tr = tileRangeForBbox(bbox, z);
           for (let x = tr.xMin; x <= tr.xMax; x++) {
             for (let y = tr.yMin; y <= tr.yMax; y++) {
-              const url = `/tiles/${layer}/${z}/${x}/${y}.png`;
+              const url = tileURL(layer, z, x, y);
               try {
                 const head = await fetch(url, { method: 'HEAD' });
                 if (head.ok && head.headers.get('X-Tile-Cached') === 'true') {
@@ -763,7 +769,7 @@ GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
         const checks = fogActiveLayers.map(layer => {
           const key = `${layer}/${z}/${x}/${y}`;
           if (fogCache[key]) return Promise.resolve(true);
-          return fetch(`/tiles/${layer}/${z}/${x}/${y}.png`, { method: 'HEAD' })
+          return fetch(tileURL(layer, z, x, y), { method: 'HEAD' })
             .then(r => {
               if (r.ok && r.headers.get('X-Tile-Cached') === 'true') {
                 fogCache[key] = true;
@@ -929,7 +935,7 @@ GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
 
           for (const layer of active) {
             if (missingByLayer[layer].has(`${tile.x},${tile.y}`)) {
-              const url = `/tiles/${layer}/${z}/${tile.x}/${tile.y}.png`;
+              const url = tileURL(layer, z, tile.x, tile.y);
               try {
                 const res = await fetch(url);
                 if (!res.ok) {
@@ -1061,7 +1067,7 @@ GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
               const pos = map.getCenter();
               const { x, y } = latLonToTileXY(pos.lat, pos.lng, z);
               for (const layer of active) {
-                fetch(`/tiles/${layer}/${z}/${x}/${y}.png`).catch(() => {});
+                fetch(tileURL(layer, z, x, y)).catch(() => {});
               }
             }
             loadStats();
@@ -1125,7 +1131,7 @@ GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
           return;
         }
         const { layer, z, x, y } = data;
-        const tileRes = await fetch(`/tiles/${layer}/${z}/${x}/${y}.png`);
+        const tileRes = await fetch(tileURL(layer, z, x, y));
         if (tileRes.ok) {
           bgCount++;
           bgTotal++;

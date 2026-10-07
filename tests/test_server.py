@@ -140,6 +140,12 @@ class TestStaticEndpoints(ServerFixture):
     def test_unknown_layer_tile(self):
         self.assertEqual(self.get_status('/tiles/xxx/12/1/1.png'), 404)
 
+    def test_index_injects_version(self):
+        """index.html wird mit eingesetzter Server-Version ausgeliefert."""
+        body = self.get('/').read()
+        self.assertNotIn(b'__TILE_SERVER_VERSION__', body)
+        self.assertIn(serve.VERSION.encode(), body)
+
 
 class TestTileServing(ServerFixture):
     """Kachel-Abruf: Cache-Hit, BBox-404, Zoom-404, Mocked-Upstream."""
@@ -246,6 +252,13 @@ class TestTileServing(ServerFixture):
         with mock.patch.object(serve.urllib.request, 'urlopen',
                                side_effect=fake_urlopen_factory(b'<html>error</html>' * 100)):
             self.assertEqual(self.get_status('/tiles/mv_dop/12/2186/1325.png'), 502)
+
+    def test_tile_url_with_version_query(self):
+        """?v=…-Cache-Buster-Query wird toleriert (gleiche Kachel)."""
+        self.seed_tile('osm', 12, 2163, 1324)
+        r = self.get('/tiles/osm/12/2163/1324.png?v=999')
+        self.assertEqual(r.status, 200)
+        self.assertEqual(r.read(), PNG_REAL)
 
     def test_upstream_error_502(self):
         with mock.patch.object(serve.urllib.request, 'urlopen',

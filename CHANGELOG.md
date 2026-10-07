@@ -4,6 +4,26 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.2] - 2026-10-07
+
+Bugfix: Der Browser-Cache hielt alte weiße/opake Kacheln
+(`Cache-Control: max-age=31536000`), sodass das Self-Healing aus 1.2.1
+nicht griff. (KI: Devin, Modell: SWE-2 High)
+
+### Fixed
+
+- **Cache-Busting:** Alle Kachel-URLs im Frontend tragen jetzt
+  `?v=<server-version>` — eine neue Version invalidiert automatisch den
+  Browser-Cache der Kacheln. `index.html` wird dafür serverseitig mit
+  eingesetzter `__TILE_SERVER_VERSION__`-Platzhalter-Version und
+  `Cache-Control: no-cache` ausgeliefert (statt statisch).
+- `serve.py`: Tile-Routing (`GET`/`HEAD`) toleriert nun Query-Strings
+  (`urlparse` statt `self.path`-Match).
+
+### Added
+
+- Tests: Tile-Request mit `?v=`-Query, Version-Injection in index.html.
+
 ## [1.2.1] - 2026-10-07
 
 Bugfix: einfarbige Kacheln (opak weiß aus der Zeit vor `TRANSPARENT=true`
