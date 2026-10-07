@@ -8,6 +8,16 @@
   <style>
     html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
     #map { width: 100%; height: 100%; }
+    /* Ozean-Farbe der Weltgrundkarte (statt weißem Leaflet-Hintergrund) */
+    .leaflet-container { background: #b8cfe0; }
+    /* Ländernamen-Labels der Weltgrundkarte */
+    .wlbl {
+      background: transparent; border: none; box-shadow: none;
+      color: #46505a; font-size: 10px; font-weight: 600;
+      text-shadow: 0 0 3px #f4f0e6, 0 0 3px #f4f0e6, 0 0 3px #f4f0e6;
+      pointer-events: none;
+    }
+    .wlbl::before { display: none; }
     .panel {
       position: absolute;
       z-index: 1000;
@@ -142,6 +152,7 @@
     <h4>Kartenstatus</h4>
     <label>Kartenmaterial (Mehrfachauswahl möglich):</label>
     <div id="base-layers"></div>
+    <label><input type="checkbox" id="cb-world" checked /> Weltgrundkarte (Länder &amp; Namen)</label>
     <label><input type="checkbox" id="cb-borders" /> Landes- & Staatsgrenzen einblenden</label>
     Zoom: <span id="zoom-level">-</span><br/>
     <div id="layer-status"></div>
@@ -236,13 +247,16 @@
     const LAYER_LIMITS = Object.fromEntries(LAYER_DEFS.map(l => [l.id, { min: l.min || 8, max: l.max }]));
 
     const map = L.map('map', {
-      minZoom: 8,
+      minZoom: 4,
       maxZoom: 19,
       maxBounds: [[COVERAGE_BBOX[0], COVERAGE_BBOX[1]], [COVERAGE_BBOX[2], COVERAGE_BBOX[3]]],
       maxBoundsViscosity: 0.5
     }).setView([53.9, 10.4], 8);
     window.map = map;  // für Debugging/Tests (z. B. map.setView in der Konsole)
     L.control.scale({ imperial: false }).addTo(map);
+    map.createPane('worldPane');
+    map.getPane('worldPane').style.zIndex = 60;
+    map.getPane('worldPane').style.pointerEvents = 'none';
     map.createPane('fogPane');
     map.getPane('fogPane').style.zIndex = 650;
     map.createPane('borderPane');
@@ -329,6 +343,7 @@
     const leafletLayers = {};
     LAYER_DEFS.forEach(def => {
       leafletLayers[def.id] = new FallbackTileLayer(tileURL(def.id, '{z}', '{x}', '{y}'), {
+        minZoom: 8,  // Server-Minimum; kleineres def.min laeuft ueber Kinder-Fallback
         maxZoom: def.max,
         maxNativeZoom: def.maxNative,
         attribution: def.attribution
@@ -394,6 +409,43 @@
         ]);
       }
       borderGroup.addTo(map);
+    });
+
+    // Grobe Weltgrundkarte: Länder-Umrisse + Namen unter allen Kachel-Layern,
+    // damit beim Herauszoomen / außerhalb der Abdeckung kein Weiß bleibt.
+    // Daten: data/world_countries.geo.json (Natural Earth 110m, Public Domain).
+    let worldGroup = null, worldLabels = null;
+    function updateWorldLabels() {
+      // Kachel-Layer liefern erst ab z8 -> Labels nur dort, wo keine Kacheln
+      // angefragt werden (bzw. solange die Grundkarte sichtbar ist).
+      const show = worldGroup && map.hasLayer(worldGroup) && map.getZoom() < 8;
+      if (worldLabels) {
+        if (show && !map.hasLayer(worldLabels)) worldLabels.addTo(map);
+        if (!show && map.hasLayer(worldLabels)) map.removeLayer(worldLabels);
+      }
+    }
+    fetch('data/world_countries.geo.json').then(r => r.json()).then(geo => {
+      worldLabels = L.layerGroup();
+      worldGroup = L.geoJSON(geo, {
+        renderer: L.svg({ pane: 'worldPane' }), interactive: false,
+        style: { color: '#7a8894', weight: 0.6, fillColor: '#ece7d8', fillOpacity: 1 }
+      });
+      worldGroup.eachLayer(l => {
+        const n = l.feature && l.feature.properties && l.feature.properties.name;
+        if (!n || n === 'Antarctica') return;
+        worldLabels.addLayer(L.tooltip({
+          permanent: true, interactive: false, direction: 'center', className: 'wlbl'
+        }).setLatLng(l.getBounds().getCenter()).setContent(n));
+      });
+      worldGroup.addTo(map);
+      updateWorldLabels();
+    }).catch(e => console.warn('Weltgrundkarte nicht ladbar:', e));
+    map.on('zoomend', updateWorldLabels);
+    document.getElementById('cb-world').addEventListener('change', e => {
+      if (!worldGroup) return;
+      if (e.target.checked) worldGroup.addTo(map);
+      else map.removeLayer(worldGroup);
+      updateWorldLabels();
     });
 
     // Zoom-Anzeige + Verfügbarkeit

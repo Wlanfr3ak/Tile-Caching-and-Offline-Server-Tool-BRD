@@ -4,6 +4,35 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.5.0] - 2026-10-08
+
+Grobe Weltgrundkarte als Offline-Basiskarte: Länder-Umrisse und
+Ländernamen werden als Vektor-Layer unter allen Kachel-Layern
+eingeblendet — kein weißer Hintergrund mehr beim Herauszoomen oder
+außerhalb der Landes-Abdeckung. (KI: Devin, Modell: SWE-2 High)
+
+### Added
+
+- **`data/world_countries.geo.json`** (im Repo, ~169 KiB): 180 Länder-
+  Polygone auf Natural-Earth-110m-Basis (Public Domain), auf das
+  `name`-Attribut und 2 Nachkommastellen reduziert.
+- **`worldPane`** (zIndex 60, unter dem Leaflet-TilePane 200): helle
+  Landflächen (#ece7d8), dezente Grenzen, Ozean-Hintergrund (#b8cfe0).
+- **Ländernamen-Labels** (`.wlbl`): permanente Tooltips am
+  Polygon-Schwerpunkt, nur sichtbar auf Zoomstufen < 8 (dort, wo keine
+  Landes-Kacheln existieren).
+- Checkbox „Weltgrundkarte (Länder & Namen)" im Kartenstatus-Panel
+  (standardmäßig an).
+- Karte ist jetzt bis Zoom 4 herauszoombar (`minZoom` 4); Kachel-Layer
+  behalten `minZoom` 8, sodass unter z8 gar keine Tile-Requests entstehen
+  und die Weltgrundkarte durchscheint.
+
+### Tests
+
+- `TestWorldBasemap`: Welt-Polygone im worldPane (≥150, zIndex < 200),
+  Ländernamen bei z4 (>100 Labels, u. a. „Germany"), Ozean-Farbe,
+  Toggle-Funktion.
+
 ## [1.4.0] - 2026-10-08
 
 Vollständige Deutschland-Abdeckung: alle 16 Bundesländer liegen jetzt als

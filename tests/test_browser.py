@@ -263,6 +263,56 @@ class TestBorderOverlay(BrowserFixture):
         self.assertEqual(n, 0)
 
 
+class TestWorldBasemap(BrowserFixture):
+    """Grobe Weltgrundkarte (Länder-Polygone + Namen) unter den Kacheln."""
+
+    def test_35_world_polygons_present(self):
+        # z8-Sicht: Welt-Polygone im eigenen Pane unter den Kacheln
+        self.page.wait_for_selector('.leaflet-world-pane svg path',
+                                    state='attached', timeout=15000)
+        n = self.page.locator('.leaflet-world-pane path').count()
+        drawn = self.page.evaluate(
+            "[...document.querySelectorAll('.leaflet-world-pane path')]"
+            ".filter(p => (p.getAttribute('d') || '').length > 10).length")
+        z = self.page.evaluate(
+            "getComputedStyle(document.querySelector('.leaflet-world-pane')).zIndex")
+        fill = self.page.evaluate(
+            "document.querySelector('.leaflet-world-pane path')"
+            ".getAttribute('fill')")
+        print(f'  [svg] {n} Welt-Pfade ({drawn} gezeichnet), zIndex={z}, fill={fill}')
+        self.assertGreaterEqual(n, 150)          # ~180 Länder
+        self.assertGreater(drawn, 0)
+        self.assertEqual(fill, '#ece7d8')
+        self.assertLess(int(z), 200)             # unter tilePane (200)
+
+    def test_36_country_labels_low_zoom(self):
+        # Auf Zoom 4 (unter Kachel-minZoom 8) müssen Ländernamen erscheinen
+        self.page.evaluate("map.setView([51, 10], 4)")
+        self.wait_settled(1500)
+        labels = self.page.locator('.wlbl')
+        n = labels.count()
+        texts = [labels.nth(i).text_content() for i in range(min(n, 200))]
+        print(f'  [labels] {n} Ländernamen, z.B.: {texts[:8]}')
+        self.assertGreater(n, 100)
+        self.assertIn('Germany', texts)
+        self.screenshot('world_basemap')
+
+    def test_37_world_toggle_and_ocean(self):
+        bg = self.page.evaluate(
+            "getComputedStyle(document.querySelector('.leaflet-container')).backgroundColor")
+        print(f'  [css] Karten-Hintergrund: {bg}')
+        self.assertEqual(bg, 'rgb(184, 207, 224)')   # #b8cfe0
+        # Toggle aus -> Pane-Pfade + Labels weg
+        self.page.uncheck('#cb-world')
+        self.wait_settled(800)
+        n = self.page.locator('.leaflet-world-pane path').count()
+        lbl = self.page.locator('.wlbl').count()
+        print(f'  [dom] nach Toggle: {n} Pfade, {lbl} Labels')
+        self.assertEqual(n, 0)
+        self.assertEqual(lbl, 0)
+        self.page.check('#cb-world')
+
+
 class TestInteraction(BrowserFixture):
     def test_40_map_click_adds_point(self):
         self.page.mouse.click(900, 450)

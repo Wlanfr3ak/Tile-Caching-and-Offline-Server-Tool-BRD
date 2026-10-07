@@ -19,6 +19,11 @@ von anderen Programmen (GIS, MBTiles-Tools, OSM-Viewer) weiterverwendet werden.
   dargestellt (Qualität sinkt entsprechend, Anzeige bleibt aber erhalten)
 - **Parallele Landes-Layer:** mehrere Layer gleichzeitig einblendbar —
   Gebiete ohne Abdeckung sind transparent, nicht weiß (WMS `TRANSPARENT=true`)
+- **Weltgrundkarte:** grobe Länder-Umrisse + Ländernamen (Natural Earth
+  110 m, im Repo unter `data/world_countries.geo.json`) liegen unter allen
+  Kachel-Layern — beim Herauszoomen und außerhalb der DOP-Abdeckung bleibt
+  eine Karte sichtbar statt einer weißen Fläche. Per Checkbox abschaltbar;
+  die Karte ist ab Zoom 4 nutzbar (Kachel-Layer greifen ab Zoom 8).
 - **Grenzen-Overlay:** Bundesländergrenzen rot + Staatsgrenze blau, per
   Checkbox über allen Layern einblendbar (lokale Geometrien in `data/`)
 - **Landesgrenz-Maskierung:** Kachelinhalte werden pro Layer hart an der
