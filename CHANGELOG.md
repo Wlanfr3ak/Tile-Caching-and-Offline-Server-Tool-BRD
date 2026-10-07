@@ -4,6 +4,28 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.6.0] - 2026-10-08
+
+UI-Anpassung: Landesgrenzen sind jetzt standardmäßig immer sichtbar, und
+die Server-Version wird prominent in der Sidebar angezeigt.
+(KI: Devin, Modell: SWE-2 High)
+
+### Changed
+
+- **Bundesländer-/Staatsgrenzen immer eingeblendet:** Die Grenzen (Länder
+  rot, Staatsgrenze blau, `borderPane` zIndex 700) werden beim Start
+  automatisch geladen — der „Grenzen einblenden"-Schalter entfällt.
+- **Versions-Badge oben links:** `#version-badge` zeigt „Tile-Server
+  vX.Y.Z" (injizierte Server-Version, `TILE_V`) als Kopfzeile der
+  linken Sidebar — immer sichtbar ohne Scrollen.
+
+### Tests
+
+- `test_32_borders_always_on`: verifiziert, dass die Checkbox entfernt
+  ist und die Grenz-Pfade permanent vorhanden sind.
+- `TestVersionBadge.test_38_version_badge`: Badge-Text enthält die
+  Server-Version und liegt in der linken Sidebar ganz oben.
+
 ## [1.5.0] - 2026-10-08
 
 Grobe Weltgrundkarte als Offline-Basiskarte: Länder-Umrisse und

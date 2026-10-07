@@ -30,6 +30,11 @@
       max-width: 300px;
     }
     .panel h4 { margin: 0 0 6px 0; font-size: 14px; }
+    #version-badge {
+      padding: 6px 8px 4px; font: 600 11px/1.5 monospace; color: #666;
+      border-bottom: 1px solid #eee; margin-bottom: 6px; user-select: none;
+    }
+    #version-badge span { color: #999; font-weight: 400; }
     #download { top: 10px; left: 10px; }
     #info { top: 10px; right: 10px; }
     #points { top: 210px; right: 10px; max-height: 35%; overflow: auto; }
@@ -153,7 +158,6 @@
     <label>Kartenmaterial (Mehrfachauswahl möglich):</label>
     <div id="base-layers"></div>
     <label><input type="checkbox" id="cb-world" checked /> Weltgrundkarte (Länder &amp; Namen)</label>
-    <label><input type="checkbox" id="cb-borders" /> Landes- & Staatsgrenzen einblenden</label>
     Zoom: <span id="zoom-level">-</span><br/>
     <div id="layer-status"></div>
     <button id="measure-btn">Entfernung messen</button>
@@ -383,33 +387,24 @@
       statsHead.appendChild(th);
     });
 
-    // Bundesländer- (rot) & Staatsgrenze (blau), immer über allen Layern
-    let borderGroup = null;
-    document.getElementById('cb-borders').addEventListener('change', async e => {
-      if (!e.target.checked) {
-        if (borderGroup) map.removeLayer(borderGroup);
-        borderGroup = null;
-        return;
-      }
-      if (!borderGroup) {
-        const [laender, staat] = await Promise.all([
-          fetch('data/bundeslaender.geo.json').then(r => r.json()),
-          fetch('data/deutschland.geo.json').then(r => r.json())
-        ]);
-        const borderRenderer = L.svg({ pane: 'borderPane' });
-        borderGroup = L.layerGroup([
-          L.geoJSON(laender, {
-            renderer: borderRenderer, interactive: false,
-            style: { color: '#d02020', weight: 1.2, fill: false, opacity: 0.9 }
-          }),
-          L.geoJSON(staat, {
-            renderer: borderRenderer, interactive: false,
-            style: { color: '#2050d0', weight: 2.4, fill: false, opacity: 0.95 }
-          })
-        ]);
-      }
-      borderGroup.addTo(map);
-    });
+    // Bundesländer- (rot) & Staatsgrenze (blau) — immer fest eingeblendet,
+    // in eigenem Pane (zIndex 700) über allen Kachel-Layern.
+    Promise.all([
+      fetch('data/bundeslaender.geo.json').then(r => r.json()),
+      fetch('data/deutschland.geo.json').then(r => r.json())
+    ]).then(([laender, staat]) => {
+      const borderRenderer = L.svg({ pane: 'borderPane' });
+      L.layerGroup([
+        L.geoJSON(laender, {
+          renderer: borderRenderer, interactive: false,
+          style: { color: '#d02020', weight: 1.2, fill: false, opacity: 0.9 }
+        }),
+        L.geoJSON(staat, {
+          renderer: borderRenderer, interactive: false,
+          style: { color: '#2050d0', weight: 2.4, fill: false, opacity: 0.95 }
+        })
+      ]).addTo(map);
+    }).catch(e => console.warn('Grenz-Overlay nicht ladbar:', e));
 
     // Grobe Weltgrundkarte: Länder-Umrisse + Namen unter allen Kachel-Layern,
     // damit beim Herauszoomen / außerhalb der Abdeckung kein Weiß bleibt.
@@ -612,6 +607,11 @@ GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
       sidebar.id = 'sidebar';
       const mapEl = document.getElementById('map');
       document.body.insertBefore(sidebar, mapEl);
+
+      const badge = document.createElement('div');
+      badge.id = 'version-badge';
+      badge.innerHTML = `Tile-Server <span>v${TILE_V}</span>`;
+      sidebar.appendChild(badge);
 
       const overview = document.createElement('details');
       overview.open = true;

@@ -231,7 +231,7 @@ class TestZoomFallback(BrowserFixture):
 
 class TestBorderOverlay(BrowserFixture):
     def test_30_borders_on(self):
-        self.page.check('#cb-borders')
+        # Grenzen sind seit v1.6.0 fest eingeblendet (kein Toggle mehr)
         # 'attached' statt 'visible': Leaflet clipt offscreen-Polygone
         # (d="M0 0" -> nie sichtbar -> Timeout bei default 'visible')
         self.page.wait_for_selector('.leaflet-border-pane svg path',
@@ -256,11 +256,27 @@ class TestBorderOverlay(BrowserFixture):
             "getComputedStyle(document.querySelector('.leaflet-border-pane')).zIndex")
         self.assertEqual(z, '700')
 
-    def test_32_borders_off(self):
-        self.page.uncheck('#cb-borders')
-        self.wait_settled(800)
+    def test_32_borders_always_on(self):
+        """Grenz-Checkbox ist entfernt - Grenzen bleiben permanent."""
+        self.assertEqual(self.page.locator('#cb-borders').count(), 0)
         n = self.page.locator('.leaflet-border-pane path').count()
-        self.assertEqual(n, 0)
+        self.assertGreaterEqual(n, 17)  # 16 Laender + Staatsgrenze
+        self.screenshot('borders_always_on')
+
+
+class TestVersionBadge(BrowserFixture):
+    def test_38_version_badge(self):
+        """Versionsnummer wird oben links in der Sidebar angezeigt."""
+        el = self.page.locator('#version-badge')
+        el.wait_for(state='attached', timeout=5000)
+        txt = el.text_content()
+        print(f'  [dom] version-badge: {txt!r}')
+        self.assertIn(serve.VERSION, txt)
+        box = el.bounding_box()
+        self.assertIsNotNone(box)
+        self.assertLess(box['x'], 320)   # im linken Sidebar-Bereich
+        self.assertLess(box['y'], 100)   # ganz oben
+        self.screenshot('version_badge')
 
 
 class TestWorldBasemap(BrowserFixture):
