@@ -86,16 +86,44 @@ data/                  # Bundesländer-/Staatsgrenzen (GeoJSON, vendored)
 tiles/                 # Kachel-Cache (gitignored)
 install.sh/.ps1        # Abhängigkeiten nachladen
 build.py               # Release-Paket bauen (dist/)
+tests/                 # Unit-, Integrations- & Browser-Tests (run_tests.py)
+requirements-dev.txt   # Entwicklungs-Abhängigkeiten (Playwright)
 VERSION / CHANGELOG.md # Versionierung
 ```
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt       # einmalig: Playwright
+python -m playwright install chromium     # einmalig: Test-Browser
+
+python tests/run_tests.py                 # alles: Unit + Server + Browser
+python tests/run_tests.py --no-browser    # ohne Browser-Tests
+python tests/run_tests.py --no-online     # ohne echte WMS-Abrufe
+python tests/run_tests.py --unit          # nur Unit-Tests
+```
+
+- **`tests/test_unit.py`** — Kachel-/Koordinaten-Mathe, Layer-Abdeckung,
+  Leerkachel-Erkennung
+- **`tests/test_server.py`** — HTTP-Tests gegen echten Testserver
+  (Cache, BBox-/Zoom-404, Upstream-Erfolg/-Fehler, Endpunkte)
+- **`tests/test_browser.py`** — Playwright/Chromium: Tile-Laden,
+  Zoom-Fallback, parallele Layer, Grenzen-Overlay, UI-Status
+- Debug-Ausgaben: `[net]` (Requests+Status), `[px]` (Canvas-Pixel),
+  `[svg]` (Grenzpfade), `[console]`/`[pageerror]`; Screenshots unter
+  `tests/out/`
+
+Die Browser-Tests laden echte Kacheln von den WMS-Quelldiensten
+(Netzwerk nötig). In GitHub Actions laufen alle Tests vor jedem Release.
 
 ## Versionierung & Releases
 
 Jede Versionsänderung wird in [`CHANGELOG.md`](CHANGELOG.md) ausführlich
-dokumentiert. Bei einem Push mit geänderter `VERSION` auf `main` erstellt
-GitHub Actions automatisch ein Release `vX.Y.Z` mit ZIP-Build und den
-Changelog-Notes dieser Version; alte Release-Assets werden aufgeräumt.
-Regeln dazu: [`AGENTS.md`](AGENTS.md).
+dokumentiert. Bei einem Push auf `main` laufen zuerst alle Tests
+(Unit/Integration/Browser); danach erstellt GitHub Actions — wenn sich
+die `VERSION` geändert hat — automatisch ein Release `vX.Y.Z` mit
+ZIP-Build und den Changelog-Notes dieser Version; alte Release-Assets
+werden aufgeräumt. Regeln dazu: [`AGENTS.md`](AGENTS.md).
 
 ## KI-Nutzung
 

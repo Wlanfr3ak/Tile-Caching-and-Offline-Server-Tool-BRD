@@ -19,8 +19,11 @@ PACKAGE_FILES = [
     'install.sh',
     'install.ps1',
     'build.py',
+    'requirements-dev.txt',
 ]
-PACKAGE_DIRS = ['lib', 'data']
+PACKAGE_DIRS = ['lib', 'data', 'tests']
+# Innerhalb der PACKAGE_DIRS nicht mit ins Paket:
+EXCLUDE_DIRS = {'out', '__pycache__'}
 NAME = 'Tile-Caching-and-Offline-Server-Tool-BRD'
 
 
@@ -40,8 +43,11 @@ def main():
             else:
                 print(f'WARN: {rel} fehlt', file=sys.stderr)
         for d in PACKAGE_DIRS:
-            for dirpath, _dirs, files in os.walk(os.path.join(ROOT, d)):
+            for dirpath, dirs, files in os.walk(os.path.join(ROOT, d)):
+                dirs[:] = [x for x in dirs if x not in EXCLUDE_DIRS]
                 for fn in files:
+                    if fn.endswith('.pyc'):
+                        continue
                     full = os.path.join(dirpath, fn)
                     z.write(full, os.path.relpath(full, ROOT))
 

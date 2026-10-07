@@ -187,6 +187,7 @@
       maxBounds: [[COVERAGE_BBOX[0], COVERAGE_BBOX[1]], [COVERAGE_BBOX[2], COVERAGE_BBOX[3]]],
       maxBoundsViscosity: 0.5
     }).setView([53.9, 10.4], 8);
+    window.map = map;  // für Debugging/Tests (z. B. map.setView in der Konsole)
     L.control.scale({ imperial: false }).addTo(map);
     map.createPane('fogPane');
     map.getPane('fogPane').style.zIndex = 650;
@@ -206,6 +207,13 @@
     });
 
     const FallbackTileLayer = L.TileLayer.extend({
+      initialize(url, options) {
+        this._url = url;
+        L.setOptions(this, options);
+        this._inflight = new Map();  // URL -> Promise (Deduplikation)
+        this._missing = new Set();   // URLs mit 404 -> nicht nochmal anfragen
+      },
+
       createTile(coords, done) {
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 256;
@@ -217,6 +225,18 @@
         return L.Util.template(this._url, { z, x, y });
       },
 
+      _load(url) {
+        if (this._missing.has(url)) return Promise.reject(new Error('missing'));
+        let p = this._inflight.get(url);
+        if (!p) {
+          p = loadImage(url).then(
+            img => { this._inflight.delete(url); return img; },
+            err => { this._inflight.delete(url); this._missing.add(url); throw err; });
+          this._inflight.set(url, p);
+        }
+        return p;
+      },
+
       async _fillTile(canvas, coords) {
         const ctx = canvas.getContext('2d');
         // Gröbere Zoomstufen (Eltern) hochskalieren
@@ -225,7 +245,7 @@
           if (pz < 0) break;
           const px = coords.x >> d, py = coords.y >> d;
           try {
-            const img = await loadImage(this._urlAt(pz, px, py));
+            const img = await this._load(this._urlAt(pz, px, py));
             const f = 1 << d;
             ctx.drawImage(img,
               (coords.x % f) * 256 / f, (coords.y % f) * 256 / f, 256 / f, 256 / f,
@@ -233,7 +253,7 @@
             return;
           } catch (e) { /* nächste Stufe probieren */ }
         }
-        // Feinere Zoomstufen (Kinder) herunterskalieren
+        // Feinere Zoomstufen (Kinder) herunterskalieren (bis 2 Stufen tiefer)
         const fillChildren = async (c, depth, dx, dy, dw) => {
           const cz = c.z + 1;
           if (cz > 22) return;
@@ -241,10 +261,10 @@
             const cx = c.x * 2 + (i % 2), cy = c.y * 2 + (i >> 1);
             const qx = dx + (i % 2) * dw / 2, qy = dy + (i >> 1) * dw / 2;
             try {
-              const img = await loadImage(this._urlAt(cz, cx, cy));
+              const img = await this._load(this._urlAt(cz, cx, cy));
               ctx.drawImage(img, qx, qy, dw / 2, dw / 2);
             } catch (e) {
-              if (depth < 3) await fillChildren({ z: cz, x: cx, y: cy }, depth + 1, qx, qy, dw / 2);
+              if (depth < 2) await fillChildren({ z: cz, x: cx, y: cy }, depth + 1, qx, qy, dw / 2);
             }
           }));
         };
@@ -261,6 +281,9 @@
       });
     });
     leafletLayers.dtk5.addTo(map);
+
+    // Fehlgeschlagene URLs nach Zoomwechsel erneut versuchen
+    map.on('zoomend', () => Object.values(leafletLayers).forEach(l => l._missing.clear()));
 
     // UI dynamisch aus LAYER_DEFS aufbauen
     const baseLayersBox = document.getElementById('base-layers');
@@ -304,13 +327,14 @@
           fetch('data/bundeslaender.geo.json').then(r => r.json()),
           fetch('data/deutschland.geo.json').then(r => r.json())
         ]);
+        const borderRenderer = L.svg({ pane: 'borderPane' });
         borderGroup = L.layerGroup([
           L.geoJSON(laender, {
-            pane: 'borderPane', interactive: false,
+            renderer: borderRenderer, interactive: false,
             style: { color: '#d02020', weight: 1.2, fill: false, opacity: 0.9 }
           }),
           L.geoJSON(staat, {
-            pane: 'borderPane', interactive: false,
+            renderer: borderRenderer, interactive: false,
             style: { color: '#2050d0', weight: 2.4, fill: false, opacity: 0.95 }
           })
         ]);

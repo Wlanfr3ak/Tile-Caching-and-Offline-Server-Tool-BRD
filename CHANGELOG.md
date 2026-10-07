@@ -4,6 +4,70 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.0] - 2026-10-07
+
+Umfassende Testsuite (Unit, HTTP-Integration, Browser) mit Debug-Ausgaben;
+Frontend-Fallback mit Request-Deduplikation und Fehler-Cache optimiert.
+(KI: Devin, Modell: SWE-2 High)
+
+### Added
+
+- **Testsuite unter `tests/`** — ausführbar über `python tests/run_tests.py`
+  (Optionen: `--no-browser`, `--no-online`, `--unit`):
+  - `test_unit.py` — Koordinaten-/Kachel-Mathe (`lat_lon_to_tile_xy`,
+    `tile_range_for_bbox`, Kachel-BBox), Layer-Abdeckung (`tile_covered`),
+    Zoom-Grenzen, Leerkachel-Erkennung (`png_is_empty`).
+  - `test_server.py` — HTTP-Integrationstests gegen einen echten Testserver
+    (temporärer Cache, zufälliger Port): statische Routen, `/version`,
+    `/stats`, `/missing`, `/next-missing`, GeoJSON-Auslieferung, Cache-Hit/
+    HEAD-Handling, BBox-/min_zoom-404 ohne Upstream-Abruf, Upstream-Erfolg
+    mit Cache-Anlage, Leer-/Ungültig-/Fehler-Antworten; optional echte
+    WMS-Abrufe (abschaltbar via `SKIP_ONLINE=1` / `--no-online`).
+  - `test_browser.py` — Playwright/Chromium-Tests des Frontends:
+    Seitenaufbau, dynamische Layer-UI, Canvas-Kacheln mit Inhalt,
+    parallele Layer-Aktivierung, Zoom-Fallback (Eltern- wie
+    Kind-Kachel-Pfad inkl. gezeichneter Pixel), Grenzen-Overlay
+    (16 Landesgrenzen rot + Staatsgrenze blau, `borderPane` zIndex 700),
+    Karten-Interaktion und Statusanzeige; Screenshots nach `tests/out/`.
+- **Debug-Ausgaben:** `[net]`-Log aller Tile-Requests mit HTTP-Status,
+  `[px]`-Pixelestatistik pro Canvas, `[svg]`-Grenzpfad-Auswertung,
+  `[console]`/`[pageerror]`-Erfassung; `run_tests.py` mit Abschnitts-
+  Bannern und Laufzeit.
+- `requirements-dev.txt` — Entwicklungs-Abhängigkeiten (Playwright),
+  getrennt vom runtime-freien Server.
+- `serve.py`: neue Config-Option `tiles_dir` (Cache-Verzeichnis
+  verschiebbar; Tests nutzen ein temporäres Verzeichnis).
+- CI: `release.yml` um `test`-Job erweitert — Unit-, Integrations- und
+  Browser-Tests laufen vor jedem Release in GitHub Actions; ein Release
+  wird nur bei grünen Tests erstellt.
+- `build.py`: `tests/` und `requirements-dev.txt` sind im Release-ZIP
+  enthalten (`tests/out/`, `__pycache__` ausgenommen).
+
+### Changed
+
+- `index.html` (`FallbackTileLayer`): Request-Deduplikation über
+  `_inflight`-Map (gleiche URL wird nur einmal angefragt) und
+  `_missing`-Set (404-URLs werden nicht erneut abgefragt, Reset bei
+  `zoomend`) — reduziert die Fallback-Requestflut deutlich
+  (gemessen: ~1350 → ~420 Requests).
+- `index.html`: Kind-Kachel-Fallback auf Tiefe 2 begrenzt (bisher 3) —
+  kleinerer Request-Fächer bei weiterhin ausreichender Abdeckung.
+
+### Fixed
+
+- `serve.py`: Verbindungsabbrüche des Clients (`ConnectionError`, z. B.
+  abgebrochene Tile-Requests beim Zoomen) erzeugen keine Traceback-Flut
+  mehr im Server-Log.
+
+### Notes
+
+- Erkannte Leaflet-Eigenheit: Der SVG-Renderer clipt Polygone außerhalb
+  des sichtbaren Bereichs (`d="M0 0"`) — die Grenzpfade sind daher per
+  DOM-Anwesenheit statt Sichtbarkeit zu prüfen.
+- Browser-Tests benötigen Netzwerkzugriff auf die WMS-Quelldienste
+  (Kind-Kachel-Fallback lädt echte Daten); Unit-/Integrations-Tests
+  laufen offline (`--no-online`).
+
 ## [1.1.0] - 2026-10-07
 
 Zoom-Fallback für fehlende Kacheln, parallele Landes-Layer und

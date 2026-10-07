@@ -13,6 +13,14 @@ Abhängigkeit oder Datenquelle wird hier in derselben Änderung aktualisiert.
 | deutschlandGeoJSON (Bundesländer-/Staatsgrenzen) | 3_mittel | https://github.com/isellsoap/deutschlandGeoJSON (`data/`, vendored) | Unlicense (Public Domain); Basis: BKG VG250, dl-de/by-2-0 |
 | GitHub Actions    | —       | `actions/checkout`, `softprops/action-gh-release` | MIT / siehe jeweiliges Action-Repo         |
 
+### Entwicklungs-Abhängigkeiten (nur Tests, `requirements-dev.txt`)
+
+| Komponente        | Version | Quelle                                          | Lizenz                                      |
+|-------------------|---------|-------------------------------------------------|---------------------------------------------|
+| Playwright        | 1.63.0  | https://playwright.dev (pip `playwright`)       | Apache-2.0                                  |
+| pyee              | ≥ 13    | https://pypi.org/project/pyee (Playwright-Dep.) | MIT                                         |
+| greenlet          | ≥ 3.5   | https://pypi.org/project/greenlet (Playwright-Dep.) | MIT                                     |
+
 Keine weiteren Runtime-Abhängigkeiten — der Server nutzt ausschließlich die
 Python-Standardbibliothek.
 

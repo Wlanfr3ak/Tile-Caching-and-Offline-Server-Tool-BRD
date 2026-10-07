@@ -30,3 +30,6 @@ desktop.ini
 dist/
 build/
 *.zip
+
+# Test-Ausgaben (Screenshots etc.)
+tests/out/

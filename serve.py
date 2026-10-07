@@ -145,7 +145,8 @@ def load_config():
 CONFIG = load_config()
 
 PORT = int(CONFIG.get('port', 8080))
-TILES_DIR = os.path.join(ROOT, 'tiles')
+_tiles_dir = CONFIG.get('tiles_dir', 'tiles')
+TILES_DIR = _tiles_dir if os.path.isabs(_tiles_dir) else os.path.join(ROOT, _tiles_dir)
 LAYERS = CONFIG['layers']
 MIN_ZOOM = int(CONFIG.get('min_zoom', 8))
 LAYER_MAX_ZOOM = {k: int(v.get('max_zoom', 19)) for k, v in LAYERS.items()}
@@ -283,9 +284,14 @@ class TileHandler(http.server.SimpleHTTPRequestHandler):
                 self.path = '/index.html'
 
             return super().do_GET()
+        except ConnectionError:
+            pass  # Client hat die Verbindung abgebrochen (z. B. Tile-Request abgebrochen)
         except Exception:
             logger.exception("Unhandled error in do_GET for %s", self.path)
-            self.send_error(500, explain='Interner Serverfehler')
+            try:
+                self.send_error(500, explain='Interner Serverfehler')
+            except ConnectionError:
+                pass
 
     def serve_tile(self, layer: str, z: int, x: int, y: int):
         if layer not in LAYERS:
@@ -435,9 +441,14 @@ class TileHandler(http.server.SimpleHTTPRequestHandler):
                 layer, z, x, y = tile_match.group(1), int(tile_match.group(2)), int(tile_match.group(3)), int(tile_match.group(4))
                 return self.serve_tile_head(layer, z, x, y)
             return super().do_HEAD()
+        except ConnectionError:
+            pass
         except Exception:
             logger.exception("Unhandled error in do_HEAD for %s", self.path)
-            self.send_error(500, explain='Interner Serverfehler')
+            try:
+                self.send_error(500, explain='Interner Serverfehler')
+            except ConnectionError:
+                pass
 
     def serve_tile_head(self, layer: str, z: int, x: int, y: int):
         if layer not in LAYERS:

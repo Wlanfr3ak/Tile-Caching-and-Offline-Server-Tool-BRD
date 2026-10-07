@@ -1,0 +1,2 @@
+# Nur für Tests/Entwicklung — der Server selbst braucht keine pip-Pakete.
+playwright==1.63.0

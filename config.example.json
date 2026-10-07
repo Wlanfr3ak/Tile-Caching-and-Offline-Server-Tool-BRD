@@ -1,6 +1,7 @@
 {
   "$schema_comment": "Beispiel-Konfiguration. Fuer lokale Anpassungen als config.json kopieren (wird nicht ins Repo committet). Alle Angaben sind oeffentliche, ungeschuetzte Endpunkte - sensible Zugangsdaten gehoeren ausschliesslich in die lokale config.json.",
   "port": 8080,
+  "tiles_dir": "tiles",
   "min_zoom": 8,
   "user_agent": "LocalTileViewer/1.0",
   "default_bbox": [51.2, 6.5, 55.3, 14.6],

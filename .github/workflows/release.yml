@@ -14,7 +14,26 @@ env:
   KEEP_RELEASES: 5   # Anzahl Releases mit Nutzdaten, die behalten werden
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test-Abhängigkeiten installieren
+        run: |
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Unit- + HTTP-Integrations- + Browser-Tests
+        run: python tests/run_tests.py
+
   release:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
