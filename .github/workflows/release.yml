@@ -1,0 +1,88 @@
+name: Release
+
+# Läuft bei jedem Push auf main; ein Release wird nur erstellt, wenn sich die
+# VERSION gegenüber dem letzten Tag geändert hat (vX.Y.Z noch nicht existiert).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  KEEP_RELEASES: 5   # Anzahl Releases mit Nutzdaten, die behalten werden
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version prüfen
+        id: ver
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG existiert bereits -> kein neues Release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Python einrichten
+        if: steps.ver.outputs.exists == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Syntax-Check
+        if: steps.ver.outputs.exists == 'false'
+        run: python -m py_compile serve.py build.py
+
+      - name: Release-Paket bauen
+        if: steps.ver.outputs.exists == 'false'
+        run: python build.py
+
+      - name: Changelog-Abschnitt extrahieren
+        if: steps.ver.outputs.exists == 'false'
+        id: notes
+        run: |
+          awk -v v="${{ steps.ver.outputs.version }}" '
+            index($0, "## [" v "]") == 1 { in_sec=1; print; next }
+            in_sec && /^## \[/ { exit }
+            in_sec { print }
+          ' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "Release ${{ steps.ver.outputs.tag }}" > release_notes.md
+          fi
+
+      - name: Tag & GitHub Release erstellen
+        if: steps.ver.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          body_path: release_notes.md
+          files: dist/*.zip
+          generate_release_notes: false
+
+      - name: Alte Releases aufräumen
+        if: steps.ver.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Hält die letzten $KEEP_RELEASES Releases; ältere Releases werden
+          # mitsamt Assets und Tag gelöscht, damit Nutzdaten nicht ansammeln.
+          # gh release list liefert Releases bereits neueste zuerst.
+          gh release list --limit 200 --json tagName --jq '.[].tagName' \
+            | tail -n +$((KEEP_RELEASES + 1)) \
+            | while read -r tag; do
+                echo "Loesche altes Release $tag"
+                gh release delete "$tag" --yes --cleanup-tag || true
+              done

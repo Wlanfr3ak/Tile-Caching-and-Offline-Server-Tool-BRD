@@ -1,0 +1,32 @@
+# Gecachte Kartenkacheln (Nutzdaten, nicht ins Repo!)
+tiles/
+
+# Logdateien
+*.log
+log.txt
+server.log
+
+# Lokale Konfiguration / sensible Daten (siehe config.example.json)
+config.json
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS-/Editor-Dateien
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+
+# Build-Artefakte
+dist/
+build/
+*.zip

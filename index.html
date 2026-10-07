@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tile-Caching &amp; Offline Server (BRD)</title>
+  <link rel="stylesheet" href="lib/leaflet.css" />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
+    #map { width: 100%; height: 100%; }
+    .panel {
+      position: absolute;
+      z-index: 1000;
+      background: rgba(255,255,255,0.95);
+      padding: 10px 14px;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 300px;
+    }
+    .panel h4 { margin: 0 0 6px 0; font-size: 14px; }
+    #download { top: 10px; left: 10px; }
+    #info { top: 10px; right: 10px; }
+    #points { top: 210px; right: 10px; max-height: 35%; overflow: auto; }
+    #stats { bottom: 10px; right: 10px; max-height: 32%; overflow: auto; }
+    .panel label { display: block; margin: 4px 0; }
+    .panel input[type="number"] { width: 55px; }
+    .panel button {
+      margin-top: 6px;
+      padding: 5px 9px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+      background: #f7f7f7;
+    }
+    .panel button:hover { background: #e7e7e7; }
+    .panel button.active { background: #2a7; color: white; border-color: #1a6; }
+    .ok { color: #2a7; }
+    .no { color: #c22; }
+    #progress, #explore-status { margin-top: 8px; font-size: 12px; color: #333; }
+    .point-item {
+      border-bottom: 1px solid #ddd;
+      padding: 6px 0;
+      font-size: 11px;
+    }
+    .point-item:last-child { border-bottom: none; }
+    .point-item code { display: block; white-space: pre-wrap; background: #f5f5f5; padding: 3px 5px; border-radius: 3px; margin-top: 3px; }
+    .delete-btn { float: right; }
+    table.stats { width: 100%; border-collapse: collapse; font-size: 11px; }
+    table.stats th, table.stats td { text-align: left; padding: 2px 4px; }
+    table.stats tr:nth-child(even) { background: #f5f5f5; }
+    .bar { height: 8px; background: #ddd; border-radius: 4px; overflow: hidden; margin-top: 2px; }
+    .bar > div { height: 100%; background: #2a7; width: 0; }
+    .small { font-size: 11px; color: #555; }
+    .scout-icon { background: transparent; border: none; transition: transform 0.8s linear !important; }
+    .scout { font-size: 28px; line-height: 32px; animation: gallop 0.45s infinite; text-shadow: 2px 2px 4px rgba(0,0,0,0.4); }
+    .balloon-icon { background: transparent; border: none; }
+    .balloon { font-size: 28px; line-height: 28px; text-shadow: 2px 2px 4px rgba(0,0,0,0.4); animation: float 3s ease-in-out infinite; }
+    @keyframes gallop {
+      0%, 100% { transform: translateY(0) scaleX(1); }
+      50% { transform: translateY(-6px) scaleX(1); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    #sidebar {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 320px;
+      background: rgba(255,255,255,0.95);
+      z-index: 1000;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 10px;
+      box-shadow: 2px 0 6px rgba(0,0,0,0.3);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    #map { position: absolute; left: 320px; top: 0; right: 0; bottom: 0; width: auto; height: auto; }
+    .panel { display: none; }
+    #sidebar .panel {
+      display: block;
+      position: static;
+      max-width: none;
+      padding: 0;
+      background: transparent;
+      box-shadow: none;
+      border-radius: 0;
+    }
+    #sidebar .panel h4 { display: none; }
+    details { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; }
+    summary { font-weight: bold; cursor: pointer; padding: 6px 8px; background: #f7f7f7; border-radius: 4px; list-style: none; user-select: none; }
+    summary::-webkit-details-marker { display: none; }
+    .section-content { padding: 8px; }
+    #overview-summary { margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="download" class="panel">
+    <h4>Kacheln herunterladen</h4>
+    <div id="dl-layers"></div>
+    <label>Zoom von <input type="number" id="min-zoom" value="8" min="0" max="19" />
+           bis <input type="number" id="max-zoom" value="12" min="0" max="19" /></label>
+    <label>Region:
+      <select id="region">
+        <option value="view">Aktueller Kartenausschnitt</option>
+        <option value="sh">Ganz Schleswig-Holstein</option>
+        <option value="ni">Ganz Niedersachsen</option>
+        <option value="hh">Ganz Hamburg</option>
+        <option value="mv">Ganz Mecklenburg-Vorpommern</option>
+      </select>
+    </label>
+    <button id="estimate">Anzahl schätzen</button>
+    <button id="start-dl">Download starten</button>
+    <button id="explore-btn">Auto-Erkundung</button>
+    <button id="flight-btn">Heißluftballon-Modus</button>
+    <div id="progress"></div>
+    <div id="explore-status"></div>
+    <div id="flight-status"></div>
+    <button id="bg-dl-btn">Hintergrund-Download</button>
+    <div id="bg-status"></div>
+  </div>
+
+  <div id="info" class="panel">
+    <h4>Kartenstatus</h4>
+    <label>Kartenmaterial (Mehrfachauswahl möglich):</label>
+    <div id="base-layers"></div>
+    <label><input type="checkbox" id="cb-borders" /> Landes- & Staatsgrenzen einblenden</label>
+    Zoom: <span id="zoom-level">-</span><br/>
+    <div id="layer-status"></div>
+    <button id="measure-btn">Entfernung messen</button>
+    <div id="measure-result"></div>
+  </div>
+
+  <div id="points" class="panel">
+    <h4>Geklickte Punkte</h4>
+    <div class="small">Klicke auf die Karte, um Koordinaten zu speichern.</div>
+    <div id="points-list"></div>
+    <button id="clear-points">Alle löschen</button>
+  </div>
+
+  <div id="stats" class="panel">
+    <h4>Lokaler Cache pro Zoomstufe</h4>
+    <table class="stats" id="stats-table">
+      <thead><tr id="stats-head"><th>Zoom</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script src="lib/leaflet.js"></script>
+  <script>
+    const REGION_BBOXES = {
+      sh: [53.3, 7.8, 55.2, 11.5],
+      ni: [51.3, 6.6, 54.0, 11.6],
+      hh: [53.39, 9.72, 53.76, 10.35],
+      mv: [53.05, 10.6, 54.69, 14.42],
+    };
+    const COVERAGE_BBOX = [51.2, 6.5, 55.3, 14.6];
+
+    const ATTR_SH = '&copy; <a href="https://opendata.schleswig-holstein.de">GeoBasis-DE/LVermGeo SH/CC BY 4.0</a>';
+    const ATTR_NI = '&copy; <a href="https://www.lgln.niedersachsen.de">LGLN</a> / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_HH = '&copy; Freie und Hansestadt Hamburg, LGV / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_MV = '&copy; GeoBasis-DE/LVermGeo M-V / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_OSM = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+    const LAYER_DEFS = [
+      { id: 'dtk5',     label: 'DTK5 Topographie (SH)',        short: 'DTK5',   maxNative: 17, max: 19, attribution: ATTR_SH,  checked: true },
+      { id: 'dop20',    label: 'DOP20 Orthophoto (SH)',        short: 'DOP20',  maxNative: 19, max: 19, attribution: ATTR_SH,  checked: true },
+      { id: 'ni_dop20', label: 'DOP20 Orthophoto (NI)',        short: 'NI-DOP', maxNative: 19, max: 19, attribution: ATTR_NI,  checked: false },
+      { id: 'hh_dop',   label: 'DOP Orthophoto belaubt (HH)',  short: 'HH-DOP', maxNative: 19, max: 19, attribution: ATTR_HH,  checked: false },
+      { id: 'hh_dop_u', label: 'DOP Orthophoto unbelaubt (HH)',short: 'HH-DOPu',maxNative: 19, max: 19, attribution: ATTR_HH,  checked: false },
+      { id: 'mv_dop',   label: 'DOP Orthophoto (MV)',          short: 'MV-DOP', maxNative: 19, max: 19, attribution: ATTR_MV,  checked: false },
+      { id: 'mv_dtk10', label: 'DTK10 Topographie (MV)',       short: 'MV-DTK', min: 15, maxNative: 18, max: 18, attribution: ATTR_MV,  checked: false },
+      { id: 'osm',      label: 'OpenStreetMap',                short: 'OSM',    maxNative: 19, max: 19, attribution: ATTR_OSM, checked: false },
+    ];
+    const LAYER_IDS = LAYER_DEFS.map(l => l.id);
+    const LAYER_LIMITS = Object.fromEntries(LAYER_DEFS.map(l => [l.id, { min: l.min || 8, max: l.max }]));
+
+    const map = L.map('map', {
+      minZoom: 8,
+      maxZoom: 19,
+      maxBounds: [[COVERAGE_BBOX[0], COVERAGE_BBOX[1]], [COVERAGE_BBOX[2], COVERAGE_BBOX[3]]],
+      maxBoundsViscosity: 0.5
+    }).setView([53.9, 10.4], 8);
+    L.control.scale({ imperial: false }).addTo(map);
+    map.createPane('fogPane');
+    map.getPane('fogPane').style.zIndex = 650;
+    map.createPane('borderPane');
+    map.getPane('borderPane').style.zIndex = 700;
+    map.getPane('borderPane').style.pointerEvents = 'none';
+
+    // Tile-Layer mit Zoom-Fallback: fehlt eine Kachel (404/Leerkachel), wird
+    // zunächst die nächstgröbere Zoomstufe geladen und hochskaliert; gibt es
+    // dort auch nichts, werden die 4 Kind-Kacheln der nächstfeineren Stufe
+    // herunterskaliert eingesetzt (rekursiv, bis Tiefe 3).
+    const loadImage = url => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+
+    const FallbackTileLayer = L.TileLayer.extend({
+      createTile(coords, done) {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 256;
+        this._fillTile(canvas, coords).then(() => done(null, canvas));
+        return canvas;
+      },
+
+      _urlAt(z, x, y) {
+        return L.Util.template(this._url, { z, x, y });
+      },
+
+      async _fillTile(canvas, coords) {
+        const ctx = canvas.getContext('2d');
+        // Gröbere Zoomstufen (Eltern) hochskalieren
+        for (let d = 0; d <= 4; d++) {
+          const pz = coords.z - d;
+          if (pz < 0) break;
+          const px = coords.x >> d, py = coords.y >> d;
+          try {
+            const img = await loadImage(this._urlAt(pz, px, py));
+            const f = 1 << d;
+            ctx.drawImage(img,
+              (coords.x % f) * 256 / f, (coords.y % f) * 256 / f, 256 / f, 256 / f,
+              0, 0, 256, 256);
+            return;
+          } catch (e) { /* nächste Stufe probieren */ }
+        }
+        // Feinere Zoomstufen (Kinder) herunterskalieren
+        const fillChildren = async (c, depth, dx, dy, dw) => {
+          const cz = c.z + 1;
+          if (cz > 22) return;
+          await Promise.all([0, 1, 2, 3].map(async i => {
+            const cx = c.x * 2 + (i % 2), cy = c.y * 2 + (i >> 1);
+            const qx = dx + (i % 2) * dw / 2, qy = dy + (i >> 1) * dw / 2;
+            try {
+              const img = await loadImage(this._urlAt(cz, cx, cy));
+              ctx.drawImage(img, qx, qy, dw / 2, dw / 2);
+            } catch (e) {
+              if (depth < 3) await fillChildren({ z: cz, x: cx, y: cy }, depth + 1, qx, qy, dw / 2);
+            }
+          }));
+        };
+        await fillChildren(coords, 1, 0, 0, 256);
+      }
+    });
+
+    const leafletLayers = {};
+    LAYER_DEFS.forEach(def => {
+      leafletLayers[def.id] = new FallbackTileLayer(`/tiles/${def.id}/{z}/{x}/{y}.png`, {
+        maxZoom: def.max,
+        maxNativeZoom: def.maxNative,
+        attribution: def.attribution
+      });
+    });
+    leafletLayers.dtk5.addTo(map);
+
+    // UI dynamisch aus LAYER_DEFS aufbauen
+    const baseLayersBox = document.getElementById('base-layers');
+    const dlLayers = document.getElementById('dl-layers');
+    const statusBox = document.getElementById('layer-status');
+    const statsHead = document.getElementById('stats-head');
+    LAYER_DEFS.forEach(def => {
+      const opt = document.createElement('label');
+      opt.innerHTML = `<input type="checkbox" id="bl-${def.id}"${def.id === 'dtk5' ? ' checked' : ''} /> ${def.label}`;
+      baseLayersBox.appendChild(opt);
+      opt.querySelector('input').addEventListener('change', e => {
+        const lyr = leafletLayers[def.id];
+        if (e.target.checked) map.addLayer(lyr);
+        else if (map.hasLayer(lyr)) map.removeLayer(lyr);
+      });
+
+      const lab = document.createElement('label');
+      lab.innerHTML = `<input type="checkbox" id="dl-${def.id}"${def.checked ? ' checked' : ''} /> ${def.label}`;
+      dlLayers.appendChild(lab);
+
+      const line = document.createElement('div');
+      const rangeTxt = `${def.min && def.min > 8 ? `ab ${def.min}, ` : ''}bis ${def.max}${def.maxNative < def.max ? `, nativ bis ${def.maxNative}` : ''}`;
+      line.innerHTML = `${def.short}: <span id="${def.id}-status" class="ok">verfügbar</span> (${rangeTxt})`;
+      statusBox.appendChild(line);
+
+      const th = document.createElement('th');
+      th.textContent = def.short;
+      statsHead.appendChild(th);
+    });
+
+    // Bundesländer- (rot) & Staatsgrenze (blau), immer über allen Layern
+    let borderGroup = null;
+    document.getElementById('cb-borders').addEventListener('change', async e => {
+      if (!e.target.checked) {
+        if (borderGroup) map.removeLayer(borderGroup);
+        borderGroup = null;
+        return;
+      }
+      if (!borderGroup) {
+        const [laender, staat] = await Promise.all([
+          fetch('data/bundeslaender.geo.json').then(r => r.json()),
+          fetch('data/deutschland.geo.json').then(r => r.json())
+        ]);
+        borderGroup = L.layerGroup([
+          L.geoJSON(laender, {
+            pane: 'borderPane', interactive: false,
+            style: { color: '#d02020', weight: 1.2, fill: false, opacity: 0.9 }
+          }),
+          L.geoJSON(staat, {
+            pane: 'borderPane', interactive: false,
+            style: { color: '#2050d0', weight: 2.4, fill: false, opacity: 0.95 }
+          })
+        ]);
+      }
+      borderGroup.addTo(map);
+    });
+
+    // Zoom-Anzeige + Verfügbarkeit
+    function updateZoomInfo() {
+      const z = map.getZoom();
+      document.getElementById('zoom-level').textContent = z;
+      LAYER_DEFS.forEach(def => {
+        const el = document.getElementById(`${def.id}-status`);
+        if (!el) return;
+        const minZ = def.min || 8;
+        if (z < minZ || z > def.max) {
+          el.textContent = 'nicht verfügbar';
+        } else if (z <= def.maxNative) {
+          el.textContent = 'verfügbar';
+        } else {
+          el.textContent = 'verfügbar (vergrößert)';
+        }
+        el.className = (z >= minZ && z <= def.max) ? 'ok' : 'no';
+      });
+    }
+    map.on('zoomend', updateZoomInfo);
+    updateZoomInfo();
+
+    // Entfernungsmessung
+    let measuring = false;
+    let measurePoints = [];
+    let measureLine = null;
+    let measureMarkers = [];
+    const measureBtn = document.getElementById('measure-btn');
+    const measureResult = document.getElementById('measure-result');
+
+    function clearMeasure() {
+      if (measureLine) map.removeLayer(measureLine);
+      measureMarkers.forEach(m => map.removeLayer(m));
+      measureLine = null;
+      measureMarkers = [];
+      measurePoints = [];
+      measureResult.textContent = '';
+    }
+
+    function formatDistance(m) {
+      if (m >= 1000) return (m / 1000).toFixed(2) + ' km';
+      return Math.round(m) + ' m';
+    }
+
+    measureBtn.addEventListener('click', () => {
+      if (measuring) {
+        measuring = false;
+        clearMeasure();
+        measureBtn.textContent = 'Entfernung messen';
+      } else {
+        measuring = true;
+        measureBtn.textContent = 'Messung löschen';
+      }
+    });
+
+    // Geklickte Punkte
+    let clickPoints = [];
+    const pointsList = document.getElementById('points-list');
+
+    function toDMS(value, isLat) {
+      const abs = Math.abs(value);
+      const deg = Math.floor(abs);
+      const min = Math.floor((abs - deg) * 60);
+      const sec = ((abs - deg) * 60 - min) * 60;
+      const dir = isLat ? (value >= 0 ? 'N' : 'S') : (value >= 0 ? 'E' : 'W');
+      return `${deg}° ${min}' ${sec.toFixed(2)}" ${dir}`;
+    }
+
+    function toDDM(value, isLat) {
+      const abs = Math.abs(value);
+      const deg = Math.floor(abs);
+      const min = (abs - deg) * 60;
+      const dir = isLat ? (value >= 0 ? 'N' : 'S') : (value >= 0 ? 'E' : 'W');
+      return `${deg}° ${min.toFixed(4)}' ${dir}`;
+    }
+
+    function addClickPoint(latlng) {
+      const merc = L.CRS.EPSG3857.project(latlng);
+      const point = {
+        id: Date.now() + Math.random(),
+        latlng: latlng,
+        marker: L.circleMarker(latlng, { radius: 5, color: 'blue', fillOpacity: 0.7 }).addTo(map)
+      };
+      clickPoints.push(point);
+      renderPoints();
+    }
+
+    function renderPoints() {
+      pointsList.innerHTML = '';
+      clickPoints.forEach((p, idx) => {
+        const lat = p.latlng.lat;
+        const lng = p.latlng.lng;
+        const merc = L.CRS.EPSG3857.project(p.latlng);
+        const div = document.createElement('div');
+        div.className = 'point-item';
+        div.innerHTML = `
+          <strong>Punkt ${idx + 1}</strong>
+          <button class="delete-btn" data-id="${p.id}">Löschen</button>
+          <code>Lat/Lon: ${lat.toFixed(6)}, ${lng.toFixed(6)}
+DMS: ${toDMS(lat, true)}, ${toDMS(lng, false)}
+DDM: ${toDDM(lat, true)}, ${toDDM(lng, false)}
+EPSG:3857: ${merc.x.toFixed(2)}, ${merc.y.toFixed(2)}
+GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
+        `;
+        pointsList.appendChild(div);
+      });
+
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const id = parseFloat(e.target.dataset.id);
+          const index = clickPoints.findIndex(p => p.id === id);
+          if (index >= 0) {
+            map.removeLayer(clickPoints[index].marker);
+            clickPoints.splice(index, 1);
+            renderPoints();
+          }
+        });
+      });
+    }
+
+    document.getElementById('clear-points').addEventListener('click', () => {
+      clickPoints.forEach(p => map.removeLayer(p.marker));
+      clickPoints = [];
+      renderPoints();
+    });
+
+    map.on('click', e => {
+      if (measuring) {
+        measurePoints.push(e.latlng);
+        measureMarkers.push(L.circleMarker(e.latlng, { radius: 5, color: 'red' }).addTo(map));
+        if (measureLine) map.removeLayer(measureLine);
+        if (measurePoints.length > 1) {
+          measureLine = L.polyline(measurePoints, { color: 'red', dashArray: '5, 10' }).addTo(map);
+          let total = 0;
+          for (let i = 1; i < measurePoints.length; i++) {
+            total += map.distance(measurePoints[i - 1], measurePoints[i]);
+          }
+          measureResult.textContent = formatDistance(total);
+        }
+      } else {
+        addClickPoint(e.latlng);
+      }
+    });
+
+    // Cache-Übersicht
+    function updateCacheOverview(data) {
+      let total = 0, cached = 0;
+      for (let z = 8; z <= 19; z++) {
+        for (const l of LAYER_IDS) {
+          const s = data[l] && data[l][z];
+          if (s) { total += s.total; cached += s.cached; }
+        }
+      }
+      const percent = total ? Math.min(100, (cached / total * 100).toFixed(2)) : 0;
+      const text = document.getElementById('overview-summary');
+      const bar = document.getElementById('overview-bar');
+      if (text) text.textContent = `${percent}% gesamt – ${cached.toLocaleString('de-DE')} / ${total.toLocaleString('de-DE')} Kacheln`;
+      if (bar) bar.style.width = `${percent}%`;
+    }
+
+    function buildSidebar() {
+      const sidebar = document.createElement('div');
+      sidebar.id = 'sidebar';
+      const mapEl = document.getElementById('map');
+      document.body.insertBefore(sidebar, mapEl);
+
+      const overview = document.createElement('details');
+      overview.open = true;
+      overview.innerHTML = `
+        <summary>Cache-Übersicht</summary>
+        <div class="section-content">
+          <div id="overview-summary">Lade Cache-Status...</div>
+          <div class="bar"><div id="overview-bar" style="width:0%"></div></div>
+        </div>`;
+      sidebar.appendChild(overview);
+
+      const titles = { download: 'Download & Modi', info: 'Kartenstatus', points: 'Geklickte Punkte', stats: 'Cache pro Zoomstufe' };
+      ['download','info','points','stats'].forEach(id => {
+        const panel = document.getElementById(id);
+        if (!panel) return;
+        const details = document.createElement('details');
+        details.open = (id === 'download' || id === 'info');
+        const summary = document.createElement('summary');
+        summary.textContent = titles[id];
+        details.appendChild(summary);
+        const content = document.createElement('div');
+        content.className = 'section-content';
+        panel.parentNode.removeChild(panel);
+        content.appendChild(panel);
+        details.appendChild(content);
+        sidebar.appendChild(details);
+      });
+    }
+    buildSidebar();
+
+    // Cache-Statistik
+    async function loadStats() {
+      try {
+        const res = await fetch('/stats');
+        const data = await res.json();
+        const tbody = document.querySelector('#stats-table tbody');
+        tbody.innerHTML = '';
+        const maxZoom = Math.max(...LAYER_DEFS.map(l => l.max));
+        for (let z = 8; z <= maxZoom; z++) {
+          const row = document.createElement('tr');
+          let cells = `<td>${z}</td>`;
+          for (const l of LAYER_IDS) {
+            const s = data[l] && data[l][z];
+            cells += `<td>${s ? renderPercent(s.percent, s.cached, s.total) : '-'}</td>`;
+          }
+          row.innerHTML = cells;
+          tbody.appendChild(row);
+        }
+        updateCacheOverview(data);
+      } catch (e) {
+        console.error('Stats konnten nicht geladen werden:', e);
+      }
+    }
+
+    function renderPercent(percent, cached, total) {
+      return `
+        <div>${percent}% (${cached.toLocaleString('de-DE')} / ${total.toLocaleString('de-DE')})</div>
+        <div class="bar"><div style="width: ${Math.min(percent, 100)}%"></div></div>
+      `;
+    }
+
+    loadStats();
+    setInterval(loadStats, 5000);
+
+    // Download-Einstellungen speichern und wiederherstellen
+    function saveDownloadSettings() {
+      LAYER_IDS.forEach(id => {
+        const el = document.getElementById(`dl-${id}`);
+        if (el) localStorage.setItem(`dl-${id}`, el.checked);
+      });
+      localStorage.setItem('min-zoom', document.getElementById('min-zoom').value);
+      localStorage.setItem('max-zoom', document.getElementById('max-zoom').value);
+      localStorage.setItem('region', document.getElementById('region').value);
+    }
+    function loadDownloadSettings() {
+      const setChecked = (id, key) => { const el = document.getElementById(id); const v = localStorage.getItem(key); if (el && v !== null) el.checked = v === 'true'; };
+      LAYER_IDS.forEach(id => setChecked(`dl-${id}`, `dl-${id}`));
+      const setValue = (id, key) => { const v = localStorage.getItem(key); if (v !== null) document.getElementById(id).value = v; };
+      setValue('min-zoom', 'min-zoom');
+      setValue('max-zoom', 'max-zoom');
+      const region = localStorage.getItem('region');
+      if (region !== null) document.getElementById('region').value = region;
+    }
+    loadDownloadSettings();
+    LAYER_IDS.forEach(id => {
+      const el = document.getElementById(`dl-${id}`);
+      if (el) el.addEventListener('change', saveDownloadSettings);
+    });
+    ['min-zoom','max-zoom'].forEach(id => document.getElementById(id).addEventListener('change', saveDownloadSettings));
+    document.getElementById('region').addEventListener('change', saveDownloadSettings);
+
+    // Kachel-Hilfsfunktionen
+    function latLonToTileXY(lat, lon, z) {
+      const n = 1 << z;
+      const x = Math.floor((lon + 180) / 360 * n);
+      const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
+      return { x, y };
+    }
+
+    function tileXYToLatLng(x, y, z) {
+      const n = 1 << z;
+      const lon = x / n * 360 - 180;
+      const latRad = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n)));
+      const lat = latRad * 180 / Math.PI;
+      return [lat, lon];
+    }
+
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+    function effectiveRange(layer, minZ, maxZ) {
+      const lim = LAYER_LIMITS[layer] || { min: 8, max: 19 };
+      const min = Math.max(minZ, lim.min);
+      const max = Math.min(maxZ, lim.max);
+      return { min: Math.min(min, max), max: Math.max(min, max) };
+    }
+
+    function tileRangeForBbox(bbox, z) {
+      const nw = latLonToTileXY(bbox[2], bbox[1], z);
+      const se = latLonToTileXY(bbox[0], bbox[3], z);
+      const n = (1 << z) - 1;
+      const xMin = clamp(Math.min(nw.x, se.x), 0, n);
+      const xMax = clamp(Math.max(nw.x, se.x), 0, n);
+      const yMin = clamp(Math.min(nw.y, se.y), 0, n);
+      const yMax = clamp(Math.max(nw.y, se.y), 0, n);
+      return { xMin, xMax, yMin, yMax };
+    }
+
+    function countTiles(bbox, minZ, maxZ, layerCount) {
+      let total = 0;
+      for (let z = minZ; z <= maxZ; z++) {
+        const r = tileRangeForBbox(bbox, z);
+        total += (r.xMax - r.xMin + 1) * (r.yMax - r.yMin + 1) * layerCount;
+      }
+      return total;
+    }
+
+    function getSelectedBbox() {
+      const region = document.getElementById('region').value;
+      if (REGION_BBOXES[region]) return REGION_BBOXES[region];
+      const b = map.getBounds();
+      return [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()];
+    }
+
+    function getSelectedLayers() {
+      return LAYER_IDS.filter(id => {
+        const el = document.getElementById(`dl-${id}`);
+        return el && el.checked;
+      });
+    }
+
+    function readZoom() {
+      let minZ = parseInt(document.getElementById('min-zoom').value, 10);
+      let maxZ = parseInt(document.getElementById('max-zoom').value, 10);
+      if (minZ > maxZ) [minZ, maxZ] = [maxZ, minZ];
+      return { minZ, maxZ };
+    }
+
+    document.getElementById('estimate').addEventListener('click', () => {
+      const layers = getSelectedLayers();
+      const { minZ, maxZ } = readZoom();
+      const bbox = getSelectedBbox();
+      if (layers.length === 0) {
+        document.getElementById('progress').textContent = 'Bitte mindestens einen Layer wählen.';
+        return;
+      }
+      let total = 0;
+      for (const layer of layers) {
+        const r = effectiveRange(layer, minZ, maxZ);
+        if (r.min <= r.max) total += countTiles(bbox, r.min, r.max, 1);
+      }
+      document.getElementById('progress').textContent = `Geschätzt: ${total.toLocaleString('de-DE')} Kacheln`;
+    });
+
+    document.getElementById('start-dl').addEventListener('click', async () => {
+      const layers = getSelectedLayers();
+      const { minZ, maxZ } = readZoom();
+      const bbox = getSelectedBbox();
+      if (layers.length === 0) {
+        document.getElementById('progress').textContent = 'Bitte mindestens einen Layer wählen.';
+        return;
+      }
+
+      let total = 0;
+      for (const layer of layers) {
+        const r = effectiveRange(layer, minZ, maxZ);
+        if (r.min <= r.max) total += countTiles(bbox, r.min, r.max, 1);
+      }
+      if (total === 0 || !confirm(`Es werden ca. ${total.toLocaleString('de-DE')} Kacheln heruntergeladen. Fortsetzen?`)) {
+        return;
+      }
+
+      let done = 0;
+      let errors = 0;
+      const progressEl = document.getElementById('progress');
+      progressEl.textContent = 'Starte Download...';
+
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+      for (const layer of layers) {
+        const r = effectiveRange(layer, minZ, maxZ);
+        if (r.min > r.max) continue;
+        for (let z = r.min; z <= r.max; z++) {
+          const tr = tileRangeForBbox(bbox, z);
+          for (let x = tr.xMin; x <= tr.xMax; x++) {
+            for (let y = tr.yMin; y <= tr.yMax; y++) {
+              const url = `/tiles/${layer}/${z}/${x}/${y}.png`;
+              try {
+                const head = await fetch(url, { method: 'HEAD' });
+                if (head.ok && head.headers.get('X-Tile-Cached') === 'true') {
+                  // Bereits lokal vorhanden
+                } else {
+                  const res = await fetch(url);
+                  if (!res.ok) errors++;
+                }
+              } catch (e) {
+                errors++;
+              }
+              done++;
+              if (done % 10 === 0 || done === total) {
+                progressEl.textContent = `${done.toLocaleString('de-DE')} / ${total.toLocaleString('de-DE')} Kacheln${errors ? ` (${errors} Fehler)` : ''} (Zoom ${z})`;
+              }
+              await sleep(10);
+            }
+          }
+        }
+      }
+
+      progressEl.textContent = `Fertig: ${done.toLocaleString('de-DE')} Kacheln${errors ? `, ${errors} Fehler` : ''}.`;
+      loadStats();
+    });
+
+    // Fog of War + Auto-Erkundung (Age-of-Empires-Style)
+    let scoutMarker = null;
+    let exploreActive = false;
+    let fogLayer = null;
+    let fogCache = {};
+    let fogTiles = {};
+    let fogActiveLayers = [];
+
+    const FogLayer = L.GridLayer.extend({
+      options: { pane: 'fogPane' },
+      createTile: function (coords) {
+        const z = coords.z, x = coords.x, y = coords.y;
+        const tile = document.createElement('canvas');
+        tile.width = 256;
+        tile.height = 256;
+        const ctx = tile.getContext('2d');
+        ctx.fillStyle = 'rgba(0,0,0,0.65)';
+        ctx.fillRect(0, 0, 256, 256);
+
+        fogTiles[z] = fogTiles[z] || {};
+        fogTiles[z][x] = fogTiles[z][x] || {};
+        fogTiles[z][x][y] = tile;
+
+        const checks = fogActiveLayers.map(layer => {
+          const key = `${layer}/${z}/${x}/${y}`;
+          if (fogCache[key]) return Promise.resolve(true);
+          return fetch(`/tiles/${layer}/${z}/${x}/${y}.png`, { method: 'HEAD' })
+            .then(r => {
+              if (r.ok && r.headers.get('X-Tile-Cached') === 'true') {
+                fogCache[key] = true;
+                return true;
+              }
+              fogCache[key] = false;
+              return false;
+            })
+            .catch(() => false);
+        });
+
+        Promise.all(checks).then(results => {
+          if (results.every(Boolean)) {
+            ctx.clearRect(0, 0, 256, 256);
+          }
+        });
+
+        return tile;
+      }
+    });
+
+    function setFogCache(layer, z, x, y) {
+      fogCache[`${layer}/${z}/${x}/${y}`] = true;
+      let allCached = true;
+      for (const l of fogActiveLayers) {
+        if (!fogCache[`${l}/${z}/${x}/${y}`]) { allCached = false; break; }
+      }
+      if (allCached) {
+        const tile = fogTiles[z] && fogTiles[z][x] && fogTiles[z][x][y];
+        if (tile) tile.getContext('2d').clearRect(0, 0, 256, 256);
+      }
+    }
+
+    function showFog(layers) {
+      fogCache = {};
+      fogTiles = {};
+      fogActiveLayers = layers.slice();
+      if (fogLayer) map.removeLayer(fogLayer);
+      fogLayer = new FogLayer({ tileSize: 256 });
+      fogLayer.addTo(map);
+    }
+
+    function hideFog() {
+      if (fogLayer) map.removeLayer(fogLayer);
+      fogLayer = null;
+      fogCache = {};
+      fogTiles = {};
+      fogActiveLayers = [];
+    }
+
+    function createScout() {
+      if (scoutMarker) return;
+      const scoutIcon = L.divIcon({
+        className: 'scout-icon',
+        html: '<div class="scout">🏇</div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 24]
+      });
+      scoutMarker = L.marker([54.2, 9.8], { icon: scoutIcon, zIndexOffset: 2000 }).addTo(map);
+    }
+
+    async function getMissingTiles(layer, z, bbox) {
+      const r = tileRangeForBbox(bbox, z);
+      const res = await fetch(`/missing?layer=${layer}&z=${z}&xmin=${r.xMin}&xmax=${r.xMax}&ymin=${r.yMin}&ymax=${r.yMax}`);
+      return await res.json();
+    }
+
+    async function buildMissingQueue(z, bbox, layers) {
+      const missingByLayer = {};
+      const union = new Set();
+      for (const layer of layers) {
+        const list = await getMissingTiles(layer, z, bbox);
+        const set = new Set();
+        list.forEach(([x, y]) => {
+          const key = `${x},${y}`;
+          set.add(key);
+          union.add(key);
+        });
+        missingByLayer[layer] = set;
+      }
+      const queue = Array.from(union).map(s => {
+        const [x, y] = s.split(',').map(Number);
+        return { x, y };
+      }).sort((a, b) => a.x - b.x || a.y - b.y);
+      return { queue, missingByLayer };
+    }
+
+    const exploreBtn = document.getElementById('explore-btn');
+    const exploreStatus = document.getElementById('explore-status');
+
+    exploreBtn.addEventListener('click', () => {
+      if (exploreActive) {
+        exploreActive = false;
+        exploreBtn.textContent = 'Auto-Erkundung';
+        exploreStatus.textContent = 'Wird abgebrochen...';
+      } else {
+        exploreActive = true;
+        exploreBtn.textContent = 'Erkundung stoppen';
+        startExplore();
+      }
+    });
+
+    async function startExplore() {
+      const layers = getSelectedLayers();
+      const { minZ, maxZ } = readZoom();
+      const bbox = getSelectedBbox();
+      if (layers.length === 0) {
+        exploreStatus.textContent = 'Bitte mindestens einen Layer wählen.';
+        exploreActive = false;
+        exploreBtn.textContent = 'Auto-Erkundung';
+        return;
+      }
+
+      createScout();
+      showFog(layers);
+
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+      // Bestimme relevante Zoomstufen und aktive Layer pro Zoom
+      const zoomLayers = {};
+      for (let z = minZ; z <= maxZ; z++) {
+        const active = layers.filter(l => {
+          const r = effectiveRange(l, minZ, maxZ);
+          return z >= r.min && z <= r.max;
+        });
+        if (active.length > 0) zoomLayers[z] = active;
+      }
+
+      const zoomList = Object.keys(zoomLayers).map(Number).sort((a, b) => a - b);
+      if (zoomList.length === 0) {
+        exploreStatus.textContent = 'Keine Layer für die gewählten Zoomstufen.';
+        exploreActive = false;
+        exploreBtn.textContent = 'Auto-Erkundung';
+        hideFog();
+        return;
+      }
+
+      for (const z of zoomList) {
+        if (!exploreActive) break;
+        const active = zoomLayers[z];
+
+        exploreStatus.textContent = `Suche unbekannte Kacheln für Zoom ${z}...`;
+        const { queue, missingByLayer } = await buildMissingQueue(z, bbox, active);
+        const totalMissing = queue.reduce((sum, t) => sum + active.reduce((s, l) => s + (missingByLayer[l].has(`${t.x},${t.y}`) ? 1 : 0), 0), 0);
+        exploreStatus.textContent = `${totalMissing.toLocaleString('de-DE')} fehlende Layer-Kacheln in Zoom ${z}`;
+
+        if (queue.length > 0) {
+          const start = tileXYToLatLng(queue[0].x + 0.5, queue[0].y + 0.5, z);
+          scoutMarker.setLatLng(start);
+          map.flyTo(start, z, { duration: 1.0 });
+          await sleep(1100);
+        }
+
+        let done = 0;
+        let errors = 0;
+
+        for (let i = 0; i < queue.length && exploreActive; i++) {
+          const tile = queue[i];
+          const center = tileXYToLatLng(tile.x + 0.5, tile.y + 0.5, z);
+          scoutMarker.setLatLng(center);
+          map.panTo(center, { animate: true, duration: 0.8 });
+          await sleep(850);
+
+          for (const layer of active) {
+            if (missingByLayer[layer].has(`${tile.x},${tile.y}`)) {
+              const url = `/tiles/${layer}/${z}/${tile.x}/${tile.y}.png`;
+              try {
+                const res = await fetch(url);
+                if (!res.ok) {
+                  errors++;
+                } else {
+                  setFogCache(layer, z, tile.x, tile.y);
+                }
+              } catch (e) {
+                errors++;
+              }
+            }
+            done++;
+          }
+
+          if (done % 10 === 0 || done >= totalMissing) {
+            exploreStatus.textContent = `Zoom ${z}: ${done.toLocaleString('de-DE')} / ${totalMissing.toLocaleString('de-DE')} Layer-Kacheln${errors ? ` (${errors} Fehler)` : ''}`;
+            loadStats();
+          }
+        }
+      }
+
+      exploreActive = false;
+      exploreBtn.textContent = 'Auto-Erkundung';
+      exploreStatus.textContent = 'Erkundung beendet.';
+      hideFog();
+      loadStats();
+    }
+    let flightActive = false;
+    let balloonMarker = null;
+    const flightBtn = document.getElementById('flight-btn');
+    const flightStatus = document.getElementById('flight-status');
+
+    function createBalloon() {
+      if (balloonMarker) return;
+      const balloonIcon = L.divIcon({
+        className: 'balloon-icon',
+        html: '<div class="balloon">🎈</div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 28]
+      });
+      balloonMarker = L.marker(map.getCenter(), { icon: balloonIcon, zIndexOffset: 1000 }).addTo(map);
+    }
+
+    function removeBalloon() {
+      if (balloonMarker) { map.removeLayer(balloonMarker); balloonMarker = null; }
+    }
+
+    function followBalloon() {
+      if (balloonMarker && flightActive) balloonMarker.setLatLng(map.getCenter());
+    }
+
+    function randomPointInBbox(bbox) {
+      const lat = bbox[0] + Math.random() * (bbox[2] - bbox[0]);
+      const lon = bbox[1] + Math.random() * (bbox[3] - bbox[1]);
+      return [lat, lon];
+    }
+
+    async function flightZooms(layers, minZ, maxZ) {
+      try {
+        const res = await fetch('/stats');
+        const stats = await res.json();
+        const list = [];
+        for (let z = minZ; z <= maxZ; z++) {
+          let total = 0, count = 0;
+          for (const l of layers) {
+            const r = effectiveRange(l, minZ, maxZ);
+            if (z < r.min || z > r.max) continue;
+            if (stats[l] && stats[l][z]) { total += stats[l][z].percent; count++; }
+          }
+          if (count) {
+            const fill = total / count;
+            if (fill < 100) list.push({ z, fill });
+          }
+        }
+        return list.sort((a, b) => a.fill - b.fill).map(o => o.z);
+      } catch (e) {
+        return [];
+      }
+    }
+
+    async function startFlight() {
+      const layers = getSelectedLayers();
+      const { minZ, maxZ } = readZoom();
+      const bbox = getSelectedBbox();
+      if (layers.length === 0) {
+        flightStatus.textContent = 'Bitte mindestens einen Layer wählen.';
+        flightActive = false;
+        flightBtn.textContent = 'Heißluftballon-Modus';
+        return;
+      }
+
+      createBalloon();
+      flightStatus.textContent = 'Berechne Ballon-Kurs...';
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      const legDuration = 90; // Sekunden pro Strecke
+      map.on('move', followBalloon);
+
+      let pass = 1;
+      while (flightActive) {
+        const zoomList = await flightZooms(layers, minZ, maxZ);
+        if (zoomList.length === 0) {
+          flightStatus.textContent = 'Nichts mehr zu cachen. Ballonfahrt wird beendet.';
+          break;
+        }
+
+        for (const z of zoomList) {
+          if (!flightActive) break;
+          const active = layers.filter(l => {
+            const r = effectiveRange(l, minZ, maxZ);
+            return z >= r.min && z <= r.max;
+          });
+          flightStatus.textContent = `Ballonfahrt (Durchgang ${pass}) über Zoom ${z}...`;
+
+          for (let leg = 0; leg < 3 && flightActive; leg++) {
+            const start = randomPointInBbox(bbox);
+            const end = randomPointInBbox(bbox);
+
+            // Ballon und Karte auf Start setzen
+            map.setView(start, z, { animate: false });
+            await sleep(300);
+
+            // Eine flüssige, gleichmäßige Kamerafahrt über die gesamte Strecke
+            map.panTo(end, { animate: true, duration: legDuration, easeLinearity: 1 });
+
+            // Während der Fahrt alle 4 Sekunden Kacheln unter dem Ballon laden
+            const tileChecks = Math.ceil(legDuration / 4);
+            for (let s = 0; s < tileChecks && flightActive; s++) {
+              await sleep(4000);
+              const pos = map.getCenter();
+              const { x, y } = latLonToTileXY(pos.lat, pos.lng, z);
+              for (const layer of active) {
+                fetch(`/tiles/${layer}/${z}/${x}/${y}.png`).catch(() => {});
+              }
+            }
+            loadStats();
+          }
+        }
+
+        loadStats();
+        await sleep(2000); // kurze Pause zwischen Durchgängen
+        pass++;
+      }
+
+      map.off('move', followBalloon);
+      flightActive = false;
+      flightBtn.textContent = 'Heißluftballon-Modus';
+      flightStatus.textContent = 'Ballonfahrt beendet.';
+      removeBalloon();
+      loadStats();
+    }
+
+    flightBtn.addEventListener('click', () => {
+      if (flightActive) {
+        flightActive = false;
+        flightBtn.textContent = 'Heißluftballon-Modus';
+        flightStatus.textContent = 'Wird gelandet...';
+      } else {
+        flightActive = true;
+        flightBtn.textContent = 'Ballon stoppen';
+        startFlight();
+      }
+    });
+    // Hintergrund-Download-Modus (eine fehlende Kachel pro Sekunde)
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    let bgActive = false;
+    let bgCount = 0;
+    let bgTotal = 0;
+    const bgBtn = document.getElementById('bg-dl-btn');
+    const bgStatus = document.getElementById('bg-status');
+
+    async function tickBackground() {
+      if (!bgActive) return;
+      const layers = getSelectedLayers();
+      if (layers.length === 0) {
+        bgStatus.textContent = 'Bitte mindestens einen Layer wählen.';
+        stopBackground();
+        return;
+      }
+      const { minZ, maxZ } = readZoom();
+      const bbox = getSelectedBbox();
+      try {
+        const params = new URLSearchParams({
+          layers: layers.join(','),
+          minZ: String(minZ),
+          maxZ: String(maxZ),
+          bbox: bbox.join(',')
+        });
+        const res = await fetch(`/next-missing?${params.toString()}`);
+        const data = await res.json();
+        if (data.done) {
+          bgStatus.textContent = 'Nichts mehr zu cachen. Hintergrund-Download beendet.';
+          stopBackground();
+          return;
+        }
+        const { layer, z, x, y } = data;
+        const tileRes = await fetch(`/tiles/${layer}/${z}/${x}/${y}.png`);
+        if (tileRes.ok) {
+          bgCount++;
+          bgTotal++;
+          bgStatus.textContent = `${bgCount} Kacheln geladen (aktuell ${layer} z${z})`;
+          loadStats();
+        } else {
+          bgStatus.textContent = `Fehler beim Laden von ${layer} ${z}/${x}/${y}`;
+        }
+      } catch (e) {
+        bgStatus.textContent = 'Fehler beim Hintergrund-Abruf.';
+      }
+    }
+
+    async function runBackground() {
+      bgCount = 0;
+      bgStatus.textContent = 'Hintergrund-Download gestartet.';
+      while (bgActive) {
+        await tickBackground();
+        if (!bgActive) break;
+        await sleep(1000);
+      }
+    }
+
+    function startBackground() {
+      if (bgActive) return;
+      bgActive = true;
+      bgBtn.textContent = 'Hintergrund-Download stoppen';
+      bgBtn.classList.add('active');
+      runBackground();
+    }
+
+    function stopBackground() {
+      bgActive = false;
+      bgBtn.textContent = 'Hintergrund-Download';
+      bgBtn.classList.remove('active');
+      bgStatus.textContent = `Hintergrund-Download gestoppt. ${bgTotal} Kacheln geladen.`;
+    }
+
+    bgBtn.addEventListener('click', () => {
+      if (bgActive) stopBackground(); else startBackground();
+    });
+  </script>
+</body>
+</html>

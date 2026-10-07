@@ -1,0 +1,74 @@
+{
+  "$schema_comment": "Beispiel-Konfiguration. Fuer lokale Anpassungen als config.json kopieren (wird nicht ins Repo committet). Alle Angaben sind oeffentliche, ungeschuetzte Endpunkte - sensible Zugangsdaten gehoeren ausschliesslich in die lokale config.json.",
+  "port": 8080,
+  "min_zoom": 8,
+  "user_agent": "LocalTileViewer/1.0",
+  "default_bbox": [51.2, 6.5, 55.3, 14.6],
+  "layers": {
+    "_schema": "Pro Layer: type=wms|xyz; wms: base+layer, xyz: url-Template; optional min_zoom, max_zoom, bbox [s,w,n,e], transparent (Standard: true)",
+    "dtk5": {
+      "type": "wms",
+      "base": "https://service.gdi-sh.de/WMS_SH_DTK5_OpenGBD?",
+      "layer": "sh_dtk5_col",
+      "max_zoom": 17,
+      "bbox": [53.3, 7.8, 55.2, 11.5],
+      "_comment": "SH Digitale Topographische Karte 1:5000 - GeoBasis-DE/LVermGeo SH"
+    },
+    "dop20": {
+      "type": "wms",
+      "base": "https://dienste.gdi-sh.de/WMS_SH_DOP20col_OpenGBD?",
+      "layer": "sh_dop20_rgb",
+      "max_zoom": 19,
+      "bbox": [53.3, 7.8, 55.2, 11.5],
+      "_comment": "SH Digitale Orthophotos 20cm - GeoBasis-DE/LVermGeo SH"
+    },
+    "ni_dop20": {
+      "type": "wms",
+      "base": "https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms?",
+      "layer": "ni_dop20",
+      "max_zoom": 19,
+      "bbox": [51.3, 6.6, 54.0, 11.6],
+      "_comment": "NI DOP20 - LGLN OpenData, dl-de/by-2-0"
+    },
+    "hh_dop": {
+      "type": "wms",
+      "base": "https://geodienste.hamburg.de/wms_dop_zeitreihe_belaubt?",
+      "layer": "dop_zeitreihe_belaubt",
+      "max_zoom": 19,
+      "bbox": [53.39, 9.72, 53.76, 10.35],
+      "_comment": "HH DOP Zeitreihe belaubt - FHH/LGV, dl-de/by-2-0"
+    },
+    "hh_dop_u": {
+      "type": "wms",
+      "base": "https://geodienste.hamburg.de/wms_dop_zeitreihe_unbelaubt?",
+      "layer": "dop_zeitreihe_unbelaubt",
+      "max_zoom": 19,
+      "bbox": [53.39, 9.72, 53.76, 10.35],
+      "_comment": "HH DOP Zeitreihe unbelaubt - FHH/LGV, dl-de/by-2-0"
+    },
+    "mv_dop": {
+      "type": "wms",
+      "base": "https://www.geodaten-mv.de/dienste/adv_dop?",
+      "layer": "mv_dop",
+      "max_zoom": 19,
+      "bbox": [53.05, 10.6, 54.69, 14.42],
+      "_comment": "MV Digitale Orthophotos - LAiV M-V, dl-de/by-2-0"
+    },
+    "mv_dtk10": {
+      "type": "wms",
+      "base": "https://www.geodaten-mv.de/dienste/adv_dtk10?",
+      "layer": "mv_dtk10",
+      "min_zoom": 15,
+      "max_zoom": 18,
+      "bbox": [53.05, 10.6, 54.69, 14.42],
+      "_comment": "MV Digitale Topographische Karte 1:10000 - LAiV M-V, dl-de/by-2-0"
+    },
+    "osm": {
+      "type": "xyz",
+      "url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "max_zoom": 19,
+      "bbox": [51.2, 6.5, 55.3, 14.6],
+      "_comment": "OpenStreetMap - ODbL. Bitte Tile Usage Policy beachten."
+    }
+  }
+}
