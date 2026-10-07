@@ -322,6 +322,9 @@ class TestUpdateCheck(BrowserFixture):
     reproduzierbar, keine externe Anfrage noetig)."""
 
     def _reload_with_latest(self, tag, url='https://example.invalid/rel'):
+        # evtl. noch laufenden Refresh (vom Seitenaufbau) abwarten, sonst
+        # ueberschreibt er den Patch erst nach dem Reload
+        serve._LATEST_DONE.wait(timeout=15)
         serve.LATEST_RELEASE = {'tag': tag, 'url': url} if tag else None
         serve._LATEST_CHECKED = time.time()  # Refresh-Thread unterbinden
         self.page.reload()

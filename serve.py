@@ -59,12 +59,13 @@ REPO_URL = f'https://github.com/{GITHUB_REPO}'
 LATEST_RELEASE = None        # {'tag': 'x.y.z', 'url': '...'} oder None
 _LATEST_CHECKED = 0.0
 _LATEST_TTL = 3600.0         # Sekunden
+_LATEST_DONE = threading.Event()   # gesetzt = kein Refresh-Thread aktiv
+_LATEST_DONE.set()
 
 
 def refresh_latest_release():
     """GitHub-Latest-Release holen und in LATEST_RELEASE cachen."""
-    global LATEST_RELEASE, _LATEST_CHECKED
-    _LATEST_CHECKED = time.time()
+    global LATEST_RELEASE
     try:
         req = urllib.request.Request(
             RELEASE_API, headers={'User-Agent': USER_AGENT,
@@ -79,11 +80,17 @@ def refresh_latest_release():
     except Exception as e:
         LATEST_RELEASE = None
         logger.info('Update-Check fehlgeschlagen (offline?): %s', e)
+    finally:
+        _LATEST_DONE.set()
 
 
 def latest_release_info():
     """Gibt den Release-Cache zurück; löst bei Bedarf async Refresh aus."""
-    if time.time() - _LATEST_CHECKED > _LATEST_TTL:
+    global _LATEST_CHECKED
+    if (time.time() - _LATEST_CHECKED > _LATEST_TTL
+            and _LATEST_DONE.is_set()):
+        _LATEST_CHECKED = time.time()
+        _LATEST_DONE.clear()
         threading.Thread(target=refresh_latest_release, daemon=True).start()
     return LATEST_RELEASE
 

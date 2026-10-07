@@ -111,6 +111,9 @@ class TestStaticEndpoints(ServerFixture):
         """Gepatchter Release-Cache wird über /version ausgespielt."""
         old, old_t = serve.LATEST_RELEASE, serve._LATEST_CHECKED
         try:
+            # laufenden Refresh abwarten, damit er den Patch nicht
+            # ueberschreibt (Race beim parallelen /version-Aufruf)
+            serve._LATEST_DONE.wait(timeout=15)
             serve.LATEST_RELEASE = {'tag': '9.9.9', 'url': 'https://x.test/r'}
             serve._LATEST_CHECKED = time.time()
             data = json.loads(self.get('/version').read())
