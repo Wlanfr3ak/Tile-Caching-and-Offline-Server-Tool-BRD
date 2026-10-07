@@ -276,21 +276,36 @@ class TestVersionBadge(BrowserFixture):
         self.assertIsNotNone(box)
         self.assertLess(box['x'], 320)   # im linken Sidebar-Bereich
         self.assertLess(box['y'], 100)   # ganz oben
+        # Versionsnummer ist ein Link aufs GitHub-Repo
+        href = el.locator('#version-link').get_attribute('href')
+        print(f'  [dom] version-link -> {href}')
+        self.assertEqual(
+            href, 'https://github.com/Wlanfr3ak/'
+                  'Tile-Caching-and-Offline-Server-Tool-BRD')
         self.screenshot('version_badge')
 
     def test_39_download_toggle_button(self):
-        """Download-Panel per Map-Button ein-/ausblenden (Overlay,
-        unabhaengig von der Sidebar)."""
-        btn = self.page.locator('.dl-toggle-btn')
+        """Download-Button in der Sidebar oeffnet das Panel als Overlay
+        auf der Karte - das Panel verdeckt den Button dabei nicht."""
+        btn = self.page.locator('#dl-toggle-btn')
         self.assertEqual(btn.count(), 1)
+        bbox_btn = btn.bounding_box()
+        self.assertLess(bbox_btn['x'] + bbox_btn['width'], 350,
+                        'Download-Button nicht in der linken Sidebar')
         dl = self.page.locator('#download')
         self.assertFalse(dl.is_visible())          # zu Beginn zu
         btn.click()
         self.wait_settled(300)
         self.assertTrue(dl.is_visible())
-        # Panel liegt auf der Karte (links vom Sidebar-Rand ~320px)
-        box = dl.bounding_box()
-        self.assertGreaterEqual(box['x'], 320)
+        # Panel liegt auf der Karte (rechts vom Sidebar-Rand ~340px) und
+        # ueberlappt den Button nicht
+        bbox_panel = dl.bounding_box()
+        self.assertGreaterEqual(bbox_panel['x'], 345)
+        overlap = not (bbox_panel['x'] > bbox_btn['x'] + bbox_btn['width']
+                       or bbox_panel['y'] > bbox_btn['y'] + bbox_btn['height'])
+        self.assertFalse(overlap, 'Panel deckt den Download-Button ab')
+        # Button bleibt sichtbar & klickbar waehrend das Panel offen ist
+        self.assertTrue(btn.is_visible())
         # Download-Checkboxen sind im Overlay erreichbar
         n = self.page.locator('#dl-layers input[type=checkbox]').count()
         self.assertEqual(n, len(serve.LAYERS))
@@ -298,6 +313,52 @@ class TestVersionBadge(BrowserFixture):
         self.wait_settled(300)
         self.assertFalse(dl.is_visible())
         self.screenshot('download_overlay')
+
+
+class TestUpdateCheck(BrowserFixture):
+    """Update-Check: der Server cached das neueste GitHub-Release
+    (/version liefert 'latest'); das Frontend zeigt 'aktuell' oder einen
+    Update-Link. serve.LATEST_RELEASE wird direkt gepatcht (offline-
+    reproduzierbar, keine externe Anfrage noetig)."""
+
+    def _reload_with_latest(self, tag, url='https://example.invalid/rel'):
+        serve.LATEST_RELEASE = {'tag': tag, 'url': url} if tag else None
+        serve._LATEST_CHECKED = time.time()  # Refresh-Thread unterbinden
+        self.page.reload()
+        self.page.wait_for_selector('#version-badge', timeout=15000)
+        if tag:
+            self.page.wait_for_selector(
+                '#update-status.update-ok, #update-status.update-outdated',
+                timeout=10000)
+        else:
+            self.wait_settled(1500)
+
+    def test_44_update_available(self):
+        """Neueres Release bekannt -> Update-Hinweis mit Link."""
+        self._reload_with_latest('999.0.0', 'https://example.invalid/v999')
+        el = self.page.locator('#update-status')
+        txt = el.text_content()
+        print(f'  [update] status: {txt!r}')
+        self.assertIn('999.0.0', txt)
+        link = el.locator('a')
+        self.assertEqual(link.get_attribute('href'), 'https://example.invalid/v999')
+        self.screenshot('update_available')
+
+    def test_45_up_to_date(self):
+        """Gleiche Version -> 'aktuell'."""
+        self._reload_with_latest(serve.VERSION)
+        el = self.page.locator('#update-status')
+        txt = el.text_content()
+        print(f'  [update] status: {txt!r}')
+        self.assertIn('aktuell', txt)
+
+    def test_46_update_check_silent_fail(self):
+        """Kein Release-Info (offline) -> Badge bleibt sauber."""
+        self._reload_with_latest(None)
+        el = self.page.locator('#update-status')
+        print(f'  [update] bei fehlendem Latest: {el.text_content()!r}')
+        self.assertEqual(el.text_content().strip(), '')
+        self.assertNotIn('update-', el.get_attribute('class') or '')
 
 
 class TestWorldBasemap(BrowserFixture):

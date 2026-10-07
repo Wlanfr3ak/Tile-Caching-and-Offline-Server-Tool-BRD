@@ -28,6 +28,8 @@ import socketserver
 import ssl
 import struct
 import sys
+import threading
+import time
 import traceback
 import urllib.error
 import urllib.request
@@ -46,6 +48,45 @@ def _load_version():
 
 
 VERSION = _load_version()
+
+# --- Update-Check -----------------------------------------------------------
+# Neuestes GitHub-Release serverseitig abfragen und stundenlang cachen, damit
+# der Browser keine externe Anfrage machen muss (offline-freundlich, kein
+# Konsolen-Fehler wenn die API nicht erreichbar ist).
+GITHUB_REPO = 'Wlanfr3ak/Tile-Caching-and-Offline-Server-Tool-BRD'
+RELEASE_API = f'https://api.github.com/repos/{GITHUB_REPO}/releases/latest'
+REPO_URL = f'https://github.com/{GITHUB_REPO}'
+LATEST_RELEASE = None        # {'tag': 'x.y.z', 'url': '...'} oder None
+_LATEST_CHECKED = 0.0
+_LATEST_TTL = 3600.0         # Sekunden
+
+
+def refresh_latest_release():
+    """GitHub-Latest-Release holen und in LATEST_RELEASE cachen."""
+    global LATEST_RELEASE, _LATEST_CHECKED
+    _LATEST_CHECKED = time.time()
+    try:
+        req = urllib.request.Request(
+            RELEASE_API, headers={'User-Agent': USER_AGENT,
+                                  'Accept': 'application/vnd.github+json'})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.load(resp)
+        LATEST_RELEASE = {
+            'tag': (data.get('tag_name') or '').lstrip('v'),
+            'url': data.get('html_url'),
+        }
+        logger.info('Update-Check: neuestes Release %s', LATEST_RELEASE['tag'])
+    except Exception as e:
+        LATEST_RELEASE = None
+        logger.info('Update-Check fehlgeschlagen (offline?): %s', e)
+
+
+def latest_release_info():
+    """Gibt den Release-Cache zurück; löst bei Bedarf async Refresh aus."""
+    if time.time() - _LATEST_CHECKED > _LATEST_TTL:
+        threading.Thread(target=refresh_latest_release, daemon=True).start()
+    return LATEST_RELEASE
+
 
 logging.basicConfig(
     filename=os.path.join(ROOT, 'server.log'),
@@ -571,7 +612,13 @@ class TileHandler(http.server.SimpleHTTPRequestHandler):
                 return self.serve_tile(layer, z, x, y)
 
             if path == '/version':
-                return self.send_json({'version': VERSION})
+                latest = latest_release_info()
+                return self.send_json({
+                    'version': VERSION,
+                    'latest': latest['tag'] if latest else None,
+                    'latest_url': latest['url'] if latest else None,
+                    'repo_url': REPO_URL,
+                })
 
             if path == '/stats':
                 return self.serve_stats()

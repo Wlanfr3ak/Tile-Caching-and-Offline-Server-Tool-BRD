@@ -9,6 +9,7 @@ import socketserver
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import urllib.request
 import urllib.error
@@ -98,6 +99,25 @@ class TestStaticEndpoints(ServerFixture):
     def test_version(self):
         data = json.loads(self.get('/version').read())
         self.assertRegex(data['version'], r'^\d+\.\d+\.\d+$')
+        # Update-Check-Felder vorhanden (latest None, wenn noch nicht
+        # geprueft oder offline; nie ein Fehler)
+        self.assertIn('latest', data)
+        self.assertIn('latest_url', data)
+        self.assertIn('repo_url', data)
+        self.assertIn('Tile-Caching-and-Offline-Server-Tool-BRD',
+                      data['repo_url'])
+
+    def test_version_latest_cached(self):
+        """Gepatchter Release-Cache wird über /version ausgespielt."""
+        old, old_t = serve.LATEST_RELEASE, serve._LATEST_CHECKED
+        try:
+            serve.LATEST_RELEASE = {'tag': '9.9.9', 'url': 'https://x.test/r'}
+            serve._LATEST_CHECKED = time.time()
+            data = json.loads(self.get('/version').read())
+            self.assertEqual(data['latest'], '9.9.9')
+            self.assertEqual(data['latest_url'], 'https://x.test/r')
+        finally:
+            serve.LATEST_RELEASE, serve._LATEST_CHECKED = old, old_t
 
     def test_index(self):
         body = self.get('/').read()

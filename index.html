@@ -34,7 +34,20 @@
       padding: 6px 8px 4px; font: 600 11px/1.5 monospace; color: #666;
       border-bottom: 1px solid #eee; margin-bottom: 6px; user-select: none;
     }
-    #version-badge span { color: #999; font-weight: 400; }
+    #version-badge a { color: inherit; }
+    #version-badge a:hover { color: #2050d0; }
+    #update-status { font-weight: 400; }
+    #update-status.update-ok { color: #2a7; }
+    #update-status.update-outdated a { color: #c60; font-weight: 700; }
+    /* Sidebar-Button (gleiche Optik wie die Details-Header) */
+    .sidebar-btn {
+      display: block; width: 100%; box-sizing: border-box;
+      border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px;
+      padding: 6px 8px; background: #f7f7f7; font-weight: bold;
+      font-size: 13px; text-align: left; cursor: pointer;
+    }
+    .sidebar-btn:hover { background: #eee; }
+    .sidebar-btn.active { background: #dce8ff; border-color: #358; }
     #download { top: 10px; left: 10px; }
     #info { top: 10px; right: 10px; }
     #points { top: 210px; right: 10px; max-height: 35%; overflow: auto; }
@@ -114,7 +127,9 @@
     /* Download-Panel: schaltbares Overlay direkt auf der Karte (nicht
        mehr in der Sidebar) -> spart Platz im linken Bereich. */
     #download {
-      left: 335px; top: 62px; z-index: 1100;
+      /* Sidebar ist 320px + 10px Padding = 340px breit -> Overlay ab 350px
+         auf der Karte, verdeckt die Sidebar (und den Button) nicht. */
+      left: 350px; top: 62px; z-index: 1100;
       max-height: 82%; overflow-y: auto;
     }
     #download.open { display: block; }
@@ -222,6 +237,7 @@
     // evtl. lang gecachte (fehlerhafte) Kacheln wiederzuverwenden.
     const TILE_V = '__TILE_SERVER_VERSION__';
     const tileURL = (layer, z, x, y) => `/tiles/${layer}/${z}/${x}/${y}.png?v=${TILE_V}`;
+    const REPO_URL = 'https://github.com/Wlanfr3ak/Tile-Caching-and-Offline-Server-Tool-BRD';
 
     const ATTR_SH = '&copy; <a href="https://opendata.schleswig-holstein.de">GeoBasis-DE/LVermGeo SH/CC BY 4.0</a>';
     const ATTR_NI = '&copy; <a href="https://www.lgln.niedersachsen.de">LGLN</a> / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
@@ -274,27 +290,6 @@
     }).setView([53.9, 10.4], 8);
     window.map = map;  // für Debugging/Tests (z. B. map.setView in der Konsole)
     L.control.scale({ imperial: false }).addTo(map);
-
-    // Download-Panel als schaltbares Overlay direkt auf der Karte:
-    // Button sitzt im Leaflet-Control (oben links unter Zoom), das Panel
-    // ist komplett unabhängig von der Sidebar-Ansicht -> spart Platz.
-    const dlPanel = document.getElementById('download');
-    const DlToggleControl = L.Control.extend({
-      options: { position: 'topleft' },
-      onAdd() {
-        const btn = L.DomUtil.create('button', 'dl-toggle-btn');
-        btn.textContent = 'Download';
-        btn.title = 'Download-Panel ein-/ausblenden';
-        L.DomEvent.disableClickPropagation(btn);
-        L.DomEvent.disableScrollPropagation(btn);
-        L.DomEvent.on(btn, 'click', () => {
-          dlPanel.classList.toggle('open');
-          btn.classList.toggle('active', dlPanel.classList.contains('open'));
-        });
-        return btn;
-      }
-    });
-    map.addControl(new DlToggleControl());
     map.createPane('worldPane');
     map.getPane('worldPane').style.zIndex = 60;
     map.getPane('worldPane').style.pointerEvents = 'none';
@@ -647,8 +642,22 @@ GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
 
       const badge = document.createElement('div');
       badge.id = 'version-badge';
-      badge.innerHTML = `Tile-Server <span>v${TILE_V}</span>`;
+      badge.innerHTML = `Tile-Server <a id="version-link" href="${REPO_URL}" target="_blank" rel="noopener">v${TILE_V}</a> <span id="update-status"></span>`;
       sidebar.appendChild(badge);
+
+      // Download-Panel als Overlay auf der Karte schalten. Der Button
+      // bleibt in der Sidebar -> das aufklappende Panel (rechts davon
+      // auf der Karte) verdeckt den Button nicht.
+      const dlPanel = document.getElementById('download');
+      const dlBtn = document.createElement('button');
+      dlBtn.id = 'dl-toggle-btn';
+      dlBtn.className = 'sidebar-btn';
+      dlBtn.textContent = 'Download & Modi';
+      dlBtn.addEventListener('click', () => {
+        dlPanel.classList.toggle('open');
+        dlBtn.classList.toggle('active', dlPanel.classList.contains('open'));
+      });
+      sidebar.appendChild(dlBtn);
 
       const overview = document.createElement('details');
       overview.open = true;
@@ -678,6 +687,27 @@ GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
       });
     }
     buildSidebar();
+
+    // Update-Check: der Server cached das neueste GitHub-Release und liefert
+    // es ueber /version aus -> der Browser macht keine externe Anfrage
+    // (offline-freundlich, keine Konsolen-Fehler wenn GitHub nicht da ist).
+    (function checkUpdate() {
+      const el = document.getElementById('update-status');
+      if (!el || TILE_V.indexOf('_') >= 0) return;  // statisch geoeffnet
+      fetch('/version')
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(v => {
+          if (!v.latest) return;  // Check nicht moeglich -> nichts zeigen
+          if (v.latest === TILE_V) {
+            el.textContent = '· aktuell';
+            el.className = 'update-ok';
+          } else {
+            el.innerHTML = `· <a href="${v.latest_url || REPO_URL}" target="_blank" rel="noopener">Update v${v.latest}</a>`;
+            el.className = 'update-outdated';
+          }
+        })
+        .catch(() => {});
+    })();
 
     // Cache-Statistik
     async function loadStats() {

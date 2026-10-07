@@ -31,6 +31,10 @@ von anderen Programmen (GIS, MBTiles-Tools, OSM-Viewer) weiterverwendet werden.
   Fremdflächen außerhalb des Landes werden transparent
 - **Batch-Download:** Kacheln für Region oder Kartenausschnitt vollständig laden,
   inkl. Auto-Erkundungs- und Heißluftballon-Modus
+- **Versionsanzeige & Update-Check:** Sidebar zeigt die Server-Version
+  mit Link zum GitHub-Repo; `/version` liefert das neueste Release
+  (serverseitig gecacht, 1 h TTL) — bei verfügbarem Update erscheint ein
+  Link im Badge, offline bleibt die Anzeige sauber
 - **Cache-Statistiken:** pro Layer und Zoomstufe (`/stats`)
 - **REST-Endpunkte:** `/tiles/{layer}/{z}/{x}/{y}.png`, `/stats`, `/missing`,
   `/next-missing`, `/version`

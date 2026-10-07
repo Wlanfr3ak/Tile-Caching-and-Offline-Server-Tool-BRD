@@ -4,6 +4,40 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.8.0] - 2026-10-08
+
+Versions-Badge mit GitHub-Link und serverseitigem Update-Check;
+Download-Button zurück in die Sidebar. (KI: Devin, Modell: SWE-2 High)
+
+### Added
+
+- **Update-Check über `/version`:** Der Server fragt einmal pro Stunde
+  (gecacht, asynchron, offline-fehlertolerant) das neueste GitHub-Release
+  ab und liefert `latest`/`latest_url`/`repo_url` aus — der Browser muss
+  keine externe Anfrage machen (keine Konsolen-Fehler offline).
+- **Versions-Badge verlinkt** auf das GitHub-Repo; bei neuerer Release
+  erscheint „· Update vX.Y.Z" (orange, verlinkt), bei aktueller Version
+  „· aktuell" (grün).
+
+### Changed
+
+- **Download-Button zurück in die Sidebar:** Die Karten-Overlay-
+  Steuerung wurde durch einen Sidebar-Button (`#dl-toggle-btn`,
+  Stil wie die Sektions-Header) ersetzt. Das Download-Panel öffnet
+  weiterhin als Overlay auf der Karte (rechts der Sidebar) und deckt den
+  Button damit nicht mehr ab.
+
+### Tests
+
+- `test_39_download_toggle_button` überarbeitet: Button liegt in der
+  Sidebar (x<330), Panel öffnet auf der Karte (x≥330) ohne Überlappung.
+- `test_38_version_badge` erweitert um Link-Prüfung (Ziel = Repo-URL).
+- Neue Klasse `TestUpdateCheck` (3 Tests): Update-verfügbar-Hinweis mit
+  Link, „aktuell" bei gleicher Version, stiller Fehlschlag ohne
+  Release-Info — jeweils über gepatchten `serve.LATEST_RELEASE`-Cache.
+- `test_version`/`test_version_latest_cached`: `/version` enthält die
+  neuen Update-Check-Felder und spielt den Cache aus.
+
 ## [1.7.0] - 2026-10-08
 
 Download-Panel aus der Sidebar gelöst und als schaltbares Overlay direkt
