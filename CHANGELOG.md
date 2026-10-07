@@ -4,6 +4,32 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.2.1] - 2026-10-07
+
+Bugfix: einfarbige Kacheln (opak weiß aus der Zeit vor `TRANSPARENT=true`
+bzw. von Diensten, die die Transparenz ignorieren) überdeckten bei
+parallelen Layern die darunterliegende Karte. (KI: Devin, Modell: SWE-2 High)
+
+### Fixed
+
+- `serve.py`: `png_is_empty()` erkennt Leerkacheln jetzt durch echtes
+  PNG-Dekodieren (Filter 0-4, Colortypes 0/2/3/4/6, Bit-Tiefe 8) und
+  Pixelvergleich — bisher nur über die Dateigröße (< 512 B), wodurch
+  ~755 B große opak-weiße PNGs durchrutschten und andere Layer weiß
+  übermalten. Kacheln > 64 KiB werden ohne Dekodieren als 'echt' gewertet.
+- `serve.py` — **Cache-Self-Healing:** einfarbige Kacheln im Cache werden
+  beim Abruf automatisch verworfen und vom Quellserver neu geladen
+  (behebt Altlasten aus v1.0.x ohne manuelles Löschen von `tiles/`).
+
+### Added
+
+- `tests/pngutil.py` — Stdlib-PNG-Builder für realistische Test-Fixtures
+  (einfarbig weiß/transparent/schwarz, gemustert).
+- Neue Tests: `png_is_empty` gegen echte einfarbige PNGs (weiß/transparent/
+  schwarz) + Varianten (kaputte Daten, >64 KiB); Server-Tests für
+  opak-weiße Upstream-Antwort (404, kein Cache) und Cache-Self-Healing
+  (verworfen + Neuabruf).
+
 ## [1.2.0] - 2026-10-07
 
 Umfassende Testsuite (Unit, HTTP-Integration, Browser) mit Debug-Ausgaben;

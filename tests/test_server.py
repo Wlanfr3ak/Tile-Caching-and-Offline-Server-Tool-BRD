@@ -15,14 +15,12 @@ import urllib.error
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import serve  # noqa: E402
+import pngutil  # noqa: E402
+from pngutil import PNG_REAL, PNG_EMPTY, PNG_WHITE  # noqa: E402
 
 SKIP_ONLINE = os.environ.get('SKIP_ONLINE') == '1'
-
-# Minimales gültiges 1x1-PNG (opaque) und transparente "Leer"-PNG <512B
-PNG_REAL = (b'\x89PNG\r\n\x1a\n' + b'\x00' * 8 + b'IHDR-DUMMY' +
-            b'\x00' * 2000)
-PNG_EMPTY = b'\x89PNG\r\n\x1a\n' + b'\x00' * 300
 
 
 class FakeResponse(io.BytesIO):
@@ -212,13 +210,37 @@ class TestTileServing(ServerFixture):
             self.assertEqual(upstream_calls(m), [])
 
     def test_empty_upstream_tile_404_not_cached(self):
-        """Transparente Leer-Kachel (<512B) -> 404, nicht im Cache."""
+        """Transparente Leer-Kachel -> 404, nicht im Cache."""
         with mock.patch.object(serve.urllib.request, 'urlopen',
                                side_effect=fake_urlopen_factory(PNG_EMPTY)):
             status = self.get_status('/tiles/mv_dop/12/2185/1325.png')
             self.assertEqual(status, 404)
         self.assertFalse(os.path.exists(
             os.path.join(serve.TILES_DIR, 'mv_dop', '12', '2185', '1325.png')))
+
+    def test_white_upstream_tile_404_not_cached(self):
+        """Opak-weiße Upstream-Kachel (Dienst ignoriert TRANSPARENT)
+        -> ebenfalls 404, nicht im Cache."""
+        with mock.patch.object(serve.urllib.request, 'urlopen',
+                               side_effect=fake_urlopen_factory(PNG_WHITE)):
+            status = self.get_status('/tiles/mv_dop/12/2186/1324.png')
+            self.assertEqual(status, 404)
+        self.assertFalse(os.path.exists(
+            os.path.join(serve.TILES_DIR, 'mv_dop', '12', '2186', '1324.png')))
+
+    def test_stale_white_cache_tile_selfheals(self):
+        """Alte einfarbige Cache-Leiche wird verworfen und neu geladen."""
+        self.seed_tile('ni_dop20', 12, 2160, 1350, payload=PNG_WHITE)
+        cached = os.path.join(serve.TILES_DIR, 'ni_dop20', '12', '2160', '1350.png')
+        self.assertTrue(os.path.isfile(cached))
+        with mock.patch.object(serve.urllib.request, 'urlopen',
+                               side_effect=fake_urlopen_factory(PNG_REAL)) as m:
+            r = self.get('/tiles/ni_dop20/12/2160/1350.png')
+            self.assertEqual(r.status, 200)
+            self.assertEqual(r.read(), PNG_REAL)
+            # wurde neu vom Upstream geladen (nicht aus dem Cache)
+            self.assertEqual(len(upstream_calls(m)), 1)
+        self.assertEqual(open(cached, 'rb').read(), PNG_REAL)
 
     def test_upstream_invalid_png_502(self):
         with mock.patch.object(serve.urllib.request, 'urlopen',

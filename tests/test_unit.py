@@ -7,7 +7,9 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import serve  # noqa: E402
+import pngutil  # noqa: E402
 
 
 class TestTileMath(unittest.TestCase):
@@ -82,12 +84,31 @@ class TestTileCovered(unittest.TestCase):
 
 
 class TestPngIsEmpty(unittest.TestCase):
-    def test_tiny_is_empty(self):
-        self.assertTrue(serve.png_is_empty(b'\x89PNG' + b'0' * 300))
-        self.assertTrue(serve.png_is_empty(b'\x89PNG' + b'0' * 503))
+    """png_is_empty erkennt einfarbige PNGs (transparent ODER opak weiß)
+    durch echtes Dekodieren — nicht über die Dateigröße."""
 
-    def test_real_tile_not_empty(self):
-        self.assertFalse(serve.png_is_empty(b'\x89PNG' + b'0' * 2000))
+    def test_uniform_white_is_empty(self):
+        # opak weiß 256x256 — wie die alten Cache-Leichen (~755 B)
+        self.assertTrue(serve.png_is_empty(pngutil.PNG_WHITE))
+
+    def test_uniform_transparent_is_empty(self):
+        self.assertTrue(serve.png_is_empty(pngutil.PNG_EMPTY))
+
+    def test_uniform_black_is_empty(self):
+        self.assertTrue(serve.png_is_empty(
+            pngutil.make_png(pixel=(0, 0, 0, 255))))
+
+    def test_varied_not_empty(self):
+        self.assertFalse(serve.png_is_empty(pngutil.PNG_REAL))
+
+    def test_invalid_data_not_empty(self):
+        # kaputte/ungültige Daten gelten nicht als 'leer' (Fehlerpfad 502)
+        self.assertFalse(serve.png_is_empty(b'\x89PNG' + b'0' * 300))
+        self.assertFalse(serve.png_is_empty(b'gar kein PNG'))
+
+    def test_big_not_empty(self):
+        # >64KiB kann nicht einfarbig sein -> Früh-Exit ohne Dekodieren
+        self.assertFalse(serve.png_is_empty(b'\x89PNG\r\n\x1a\n' + b'0' * 70000))
 
 
 class TestSourceUrl(unittest.TestCase):

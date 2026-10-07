@@ -25,10 +25,12 @@ import os
 import random
 import re
 import socketserver
+import struct
 import sys
 import traceback
 import urllib.error
 import urllib.request
+import zlib
 from urllib.parse import parse_qs, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -237,8 +239,75 @@ def tile_covered(layer_cfg: dict, z: int, x: int, y: int) -> bool:
 
 
 def png_is_empty(data: bytes) -> bool:
-    """Vollständig transparente/uniforme 256er-PNGs sind < 512 Bytes klein."""
-    return len(data) < 512
+    """True, wenn das PNG komplett einfarbig ist — egal ob transparent oder
+    opak (z. B. weiß). Solche Kacheln tragen keine Information und werden
+    als 'keine Daten' behandelt, damit der Zoom-Fallback greifen kann.
+
+    Dekodiert dazu die PNG-Scanlines (Filter 0-4, Bit-Tiefe 8,
+    kein Interlacing) und vergleicht alle Pixel."""
+    if not data.startswith(b'\x89PNG\r\n\x1a\n') or len(data) < 57:
+        return False
+    if len(data) > 65536:
+        return False  # einfarbige PNGs sind winzig -> Dekoder sparen
+    try:
+        w, h, bitdepth, colortype = struct.unpack('>IIBB', data[16:26])
+        interlace = data[28]
+    except (IndexError, struct.error):
+        return False
+    if bitdepth != 8 or interlace != 0 or w == 0 or h == 0:
+        return False
+    bpp = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}.get(colortype)
+    if bpp is None:
+        return False
+    # IDAT-Chunks einsammeln
+    idat = bytearray()
+    pos = 8
+    while pos + 12 <= len(data):
+        ln = int.from_bytes(data[pos:pos + 4], 'big')
+        if data[pos + 4:pos + 8] == b'IDAT':
+            idat += data[pos + 8:pos + 8 + ln]
+        pos += 12 + ln
+    try:
+        raw = zlib.decompress(bytes(idat))
+    except zlib.error:
+        return False
+    stride = w * bpp + 1
+    if len(raw) < stride * h:
+        return False
+    prev = bytearray(w * bpp)
+    ref = None
+    for row in range(h):
+        off = row * stride
+        ft = raw[off]
+        line = bytearray(raw[off + 1:off + 1 + w * bpp])
+        if ft == 1:      # Sub
+            for i in range(bpp, len(line)):
+                line[i] = (line[i] + line[i - bpp]) & 0xFF
+        elif ft == 2:    # Up
+            for i in range(len(line)):
+                line[i] = (line[i] + prev[i]) & 0xFF
+        elif ft == 3:    # Average
+            for i in range(len(line)):
+                a = line[i - bpp] if i >= bpp else 0
+                line[i] = (line[i] + ((a + prev[i]) >> 1)) & 0xFF
+        elif ft == 4:    # Paeth
+            for i in range(len(line)):
+                a = line[i - bpp] if i >= bpp else 0
+                b = prev[i]
+                c = prev[i - bpp] if i >= bpp else 0
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                pr = a if pa <= pb and pa <= pc else (b if pb <= pc else c)
+                line[i] = (line[i] + pr) & 0xFF
+        elif ft != 0:
+            return False
+        if ref is None:
+            ref = bytes(line[:bpp])
+        for i in range(bpp, len(line), bpp):
+            if line[i:i + bpp] != ref:
+                return False
+        prev = line
+    return True
 
 
 def source_url(layer_cfg: dict, z: int, x: int, y: int) -> str:
@@ -310,8 +379,18 @@ class TileHandler(http.server.SimpleHTTPRequestHandler):
         if os.path.exists(tile_path):
             with open(tile_path, 'rb') as f:
                 data = f.read()
-            self.send_png(data, cached=True)
-            return
+            if png_is_empty(data):
+                # Alte Leerkachel (z. B. opak weiß aus der Zeit vor
+                # TRANSPARENT=true) verwerfen und neu laden.
+                logger.info('Verwerfe einfarbige Cache-Kachel %r %s',
+                            layer, (z, x, y))
+                try:
+                    os.remove(tile_path)
+                except OSError:
+                    pass
+            else:
+                self.send_png(data, cached=True)
+                return
 
         # Vom Quellserver holen und speichern
         url = source_url(LAYERS[layer], z, x, y)
