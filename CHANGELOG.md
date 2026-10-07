@@ -4,6 +4,43 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.3.0] - 2026-10-07
+
+Harte Landesgrenz-Maskierung: Kachelinhalte außerhalb der Grenze des
+jeweiligen Bundeslandes werden serverseitig transparent geschnitten —
+behebt Wasserzeichen-/Fremdflächen (z. B. MV-DOP außerhalb MVs), die
+parallele Layer überdeckten. (KI: Devin, Modell: SWE-2 High)
+
+### Added
+
+- **`mask`-Layer-Option** (config.json / config.example.json): Name des
+  Bundeslandes aus `data/bundeslaender.geo.json`. `serve.py` schneidet
+  Pixel außerhalb der Landesgrenze per Scanline-Fill (Paritätsregel —
+  unterstützt MultiPolygone und Löcher/Enklaven) auf Alpha=0. Aktiv für
+  `dtk5`, `dop20` (Schleswig-Holstein), `ni_dop20` (Niedersachsen),
+  `hh_dop`, `hh_dop_u` (Hamburg), `mv_dop`, `mv_dtk10`
+  (Mecklenburg-Vorpommern).
+  - Kachel komplett außerhalb -> `404` (Fallback greift)
+  - komplett innerhalb -> unverändert durchgereicht (kein Decode-Overhead)
+  - Randkachel -> decodiert, maskiert, als RGBA-PNG neu kodiert und
+    maskiert gecacht
+- `png_decode()` / `png_encode_rgba()` — wiederverwendbarer
+  Stdlib-PNG-Decoder/-Encoder (Unfilter 0-4, Colortypes 0/2/3/4/6).
+- Tests: `TestStateMask` (Polygon-Load, Inside/Outside/Edge, Passthrough,
+  Ausgabe-PNG-Validität) und Server-Tests für maskierte Randkachel +
+  404 für komplett außerhalb liegende Kacheln.
+
+### Changed
+
+- `png_is_empty()` nutzt intern jetzt `png_decode()`.
+
+### Notes
+
+- Maskierte Kacheln werden maskiert im Cache abgelegt — die Einmalkosten
+  je Randkachel (~0.2-0.5 s) fallen nur beim ersten Abruf an.
+- Einmalig `tiles/` leeren oder Cache-Self-Healing abwarten, falls alte
+  unmaskierte Kacheln im lokalen Cache liegen.
+
 ## [1.2.2] - 2026-10-07
 
 Bugfix: Der Browser-Cache hielt alte weiße/opake Kacheln

@@ -260,6 +260,35 @@ class TestTileServing(ServerFixture):
         self.assertEqual(r.status, 200)
         self.assertEqual(r.read(), PNG_REAL)
 
+    def test_masked_tile_outside_state_404(self):
+        """Kachel in der mv-BBox, aber komplett außerhalb des MV-Polygons
+        (Ratzeburg, SH) -> Maske entfernt alles -> 404."""
+        # z12 x2170 y1315: Ratzeburg-Gegend — in mv-BBox, nicht im MV-Polygon
+        x, y = serve.lat_lon_to_tile_xy(53.7, 10.68, 12)
+        with mock.patch.object(serve.urllib.request, 'urlopen',
+                               side_effect=fake_urlopen_factory(PNG_WHITE)):
+            self.assertEqual(self.get_status(f'/tiles/mv_dop/12/{x}/{y}.png'), 404)
+
+    def test_masked_edge_tile_keeps_inside(self):
+        """Randkachel: außerhalb MV transparent, innerhalb Inhalt."""
+        x, y = serve.lat_lon_to_tile_xy(53.87, 10.9, 12)
+        with mock.patch.object(serve.urllib.request, 'urlopen',
+                               side_effect=fake_urlopen_factory(PNG_REAL)):
+            r = self.get(f'/tiles/mv_dop/12/{x}/{y}.png')
+            self.assertEqual(r.status, 200)
+            dec = serve.png_decode(r.read())
+            self.assertIsNotNone(dec)
+            _w, _h, bpp, px = dec
+            alphas = {px[i + 3] for i in range(0, len(px), 4)}
+            self.assertIn(0, alphas)    # außerhalb transparent
+            self.assertIn(255, alphas)  # innerhalb erhalten
+        # gecacht: zweite Anfrage ohne Upstream
+        with mock.patch.object(serve.urllib.request, 'urlopen',
+                               side_effect=fake_urlopen_factory(PNG_EMPTY)) as m:
+            r2 = self.get(f'/tiles/mv_dop/12/{x}/{y}.png')
+            self.assertEqual(r2.status, 200)
+            self.assertEqual(upstream_calls(m), [])
+
     def test_upstream_error_502(self):
         with mock.patch.object(serve.urllib.request, 'urlopen',
                                side_effect=fake_urlopen_error_factory()):

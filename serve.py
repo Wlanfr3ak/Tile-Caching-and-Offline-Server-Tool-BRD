@@ -64,6 +64,7 @@ DEFAULT_CONFIG = {
             'type': 'wms',
             'base': 'https://service.gdi-sh.de/WMS_SH_DTK5_OpenGBD?',
             'layer': 'sh_dtk5_col',
+            'mask': 'Schleswig-Holstein',
             'max_zoom': 17,
             'bbox': [53.3, 7.8, 55.2, 11.5],
         },
@@ -71,6 +72,7 @@ DEFAULT_CONFIG = {
             'type': 'wms',
             'base': 'https://dienste.gdi-sh.de/WMS_SH_DOP20col_OpenGBD?',
             'layer': 'sh_dop20_rgb',
+            'mask': 'Schleswig-Holstein',
             'max_zoom': 19,
             'bbox': [53.3, 7.8, 55.2, 11.5],
         },
@@ -78,6 +80,7 @@ DEFAULT_CONFIG = {
             'type': 'wms',
             'base': 'https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms?',
             'layer': 'ni_dop20',
+            'mask': 'Niedersachsen',
             'max_zoom': 19,
             'bbox': [51.3, 6.6, 54.0, 11.6],
         },
@@ -85,6 +88,7 @@ DEFAULT_CONFIG = {
             'type': 'wms',
             'base': 'https://geodienste.hamburg.de/wms_dop_zeitreihe_belaubt?',
             'layer': 'dop_zeitreihe_belaubt',
+            'mask': 'Hamburg',
             'max_zoom': 19,
             'bbox': [53.39, 9.72, 53.76, 10.35],
         },
@@ -92,6 +96,7 @@ DEFAULT_CONFIG = {
             'type': 'wms',
             'base': 'https://geodienste.hamburg.de/wms_dop_zeitreihe_unbelaubt?',
             'layer': 'dop_zeitreihe_unbelaubt',
+            'mask': 'Hamburg',
             'max_zoom': 19,
             'bbox': [53.39, 9.72, 53.76, 10.35],
         },
@@ -99,6 +104,7 @@ DEFAULT_CONFIG = {
             'type': 'wms',
             'base': 'https://www.geodaten-mv.de/dienste/adv_dop?',
             'layer': 'mv_dop',
+            'mask': 'Mecklenburg-Vorpommern',
             'max_zoom': 19,
             'bbox': [53.05, 10.6, 54.69, 14.42],
         },
@@ -106,6 +112,7 @@ DEFAULT_CONFIG = {
             'type': 'wms',
             'base': 'https://www.geodaten-mv.de/dienste/adv_dtk10?',
             'layer': 'mv_dtk10',
+            'mask': 'Mecklenburg-Vorpommern',
             'min_zoom': 15,
             'max_zoom': 18,
             'bbox': [53.05, 10.6, 54.69, 14.42],
@@ -238,27 +245,21 @@ def tile_covered(layer_cfg: dict, z: int, x: int, y: int) -> bool:
     return s <= bbox[2] and n >= bbox[0] and w <= bbox[3] and e >= bbox[1]
 
 
-def png_is_empty(data: bytes) -> bool:
-    """True, wenn das PNG komplett einfarbig ist — egal ob transparent oder
-    opak (z. B. weiß). Solche Kacheln tragen keine Information und werden
-    als 'keine Daten' behandelt, damit der Zoom-Fallback greifen kann.
-
-    Dekodiert dazu die PNG-Scanlines (Filter 0-4, Bit-Tiefe 8,
-    kein Interlacing) und vergleicht alle Pixel."""
+def png_decode(data: bytes):
+    """PNG dekodieren (Filter 0-4, Bit-Tiefe 8, kein Interlacing).
+    Gibt (breite, höhe, bytes_pro_pixel, pixeldaten) zurück oder None."""
     if not data.startswith(b'\x89PNG\r\n\x1a\n') or len(data) < 57:
-        return False
-    if len(data) > 65536:
-        return False  # einfarbige PNGs sind winzig -> Dekoder sparen
+        return None
     try:
         w, h, bitdepth, colortype = struct.unpack('>IIBB', data[16:26])
         interlace = data[28]
     except (IndexError, struct.error):
-        return False
+        return None
     if bitdepth != 8 or interlace != 0 or w == 0 or h == 0:
-        return False
+        return None
     bpp = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}.get(colortype)
     if bpp is None:
-        return False
+        return None
     # IDAT-Chunks einsammeln
     idat = bytearray()
     pos = 8
@@ -270,12 +271,12 @@ def png_is_empty(data: bytes) -> bool:
     try:
         raw = zlib.decompress(bytes(idat))
     except zlib.error:
-        return False
+        return None
     stride = w * bpp + 1
     if len(raw) < stride * h:
-        return False
+        return None
+    px = bytearray(w * h * bpp)
     prev = bytearray(w * bpp)
-    ref = None
     for row in range(h):
         off = row * stride
         ft = raw[off]
@@ -300,14 +301,141 @@ def png_is_empty(data: bytes) -> bool:
                 pr = a if pa <= pb and pa <= pc else (b if pb <= pc else c)
                 line[i] = (line[i] + pr) & 0xFF
         elif ft != 0:
-            return False
-        if ref is None:
-            ref = bytes(line[:bpp])
-        for i in range(bpp, len(line), bpp):
-            if line[i:i + bpp] != ref:
-                return False
+            return None
+        px[row * w * bpp:(row + 1) * w * bpp] = line
         prev = line
+    return w, h, bpp, px
+
+
+def png_encode_rgba(w: int, h: int, px) -> bytes:
+    """RGBA-Pixeldaten (bpp=4, Filter 0 pro Zeile) als PNG kodieren."""
+    def chunk(typ: bytes, payload: bytes) -> bytes:
+        return (struct.pack('>I', len(payload)) + typ + payload
+                + struct.pack('>I', zlib.crc32(typ + payload) & 0xFFFFFFFF))
+    rows = bytearray()
+    stride = w * 4
+    for r in range(h):
+        rows.append(0)
+        rows += px[r * stride:(r + 1) * stride]
+    ihdr = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
+    return (b'\x89PNG\r\n\x1a\n'
+            + chunk(b'IHDR', ihdr)
+            + chunk(b'IDAT', zlib.compress(bytes(rows)))
+            + chunk(b'IEND', b''))
+
+
+def png_is_empty(data: bytes) -> bool:
+    """True, wenn das PNG komplett einfarbig ist — egal ob transparent oder
+    opak (z. B. weiß). Solche Kacheln tragen keine Information und werden
+    als 'keine Daten' behandelt, damit der Zoom-Fallback greifen kann."""
+    if not data.startswith(b'\x89PNG\r\n\x1a\n') or len(data) > 65536:
+        return False  # einfarbige PNGs sind winzig -> Dekoder sparen
+    dec = png_decode(data)
+    if dec is None:
+        return False
+    _w, _h, bpp, px = dec
+    ref = bytes(px[:bpp])
+    for i in range(bpp, len(px), bpp):
+        if px[i:i + bpp] != ref:
+            return False
     return True
+
+
+def load_state_polygons():
+    """Bundesländer-Polygone aus data/bundeslaender.geo.json laden.
+    -> {name: [ring, ...]} mit ring = [(lon, lat), ...]; Außen- und
+    Lochringe werden zusammengeführt (Füllung per Paritätsregel)."""
+    path = os.path.join(ROOT, 'data', 'bundeslaender.geo.json')
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, ValueError) as e:
+        logger.error('bundeslaender.geo.json nicht lesbar: %s', e)
+        return {}
+    polys = {}
+    for feat in data.get('features', []):
+        name = (feat.get('properties') or {}).get('name')
+        geom = feat.get('geometry') or {}
+        if geom.get('type') == 'Polygon':
+            geoms = [geom['coordinates']]
+        elif geom.get('type') == 'MultiPolygon':
+            geoms = geom['coordinates']
+        else:
+            continue
+        if name:
+            polys[name] = [ring for poly in geoms for ring in poly]
+    return polys
+
+
+STATE_POLYGONS = load_state_polygons()
+
+
+def mask_png_outside_state(data: bytes, state: str, z: int, x: int, y: int):
+    """Pixel außerhalb der Landesgrenzen auf Alpha=0 setzen.
+
+    Rückgabe:
+      - PNG-Bytes (maskiert oder Original bei vollständiger Abdeckung)
+      - None, wenn die Kachel komplett außerhalb der Landesgrenze liegt."""
+    rings = STATE_POLYGONS.get(state)
+    if not rings:
+        return data
+    n = 1 << z
+    # Grenzringe in Kachel-Pixelkoordinaten umrechnen (Web-Mercator)
+    rings_px = []
+    for ring in rings:
+        pts = []
+        for lon, lat in ring:
+            px = ((lon + 180) / 360 * n - x) * 256
+            lat_r = math.radians(lat)
+            py = ((1 - math.log(math.tan(lat_r) + 1 / math.cos(lat_r)) / math.pi)
+                  / 2 * n - y) * 256
+            pts.append((px, py))
+        rings_px.append(pts)
+
+    # Pro Pixelzeile die x-Intervalle innerhalb der Polygone bestimmen
+    # (Scanline + Paritätsregel -> deckt MultiPolygon & Löcher ab)
+    inside_rows = []
+    for r in range(256):
+        cy = r + 0.5
+        xs = []
+        for pts in rings_px:
+            m = len(pts)
+            for i in range(m):
+                x1, y1 = pts[i]
+                x2, y2 = pts[(i + 1) % m]
+                if (y1 <= cy < y2) or (y2 <= cy < y1):
+                    xs.append(x1 + (cy - y1) * (x2 - x1) / (y2 - y1))
+        xs.sort()
+        inside_rows.append([(xs[i], xs[i + 1]) for i in range(0, len(xs) - 1, 2)])
+    # Intervalle können komplett neben der Kachel liegen -> auf [0,256) prüfen
+    if not any(a < 256 and b > 0 for row in inside_rows for a, b in row):
+        return None   # komplett außerhalb der Landesgrenze
+    if all(len(row) == 1 and row[0][0] <= 0 and row[0][1] >= 256
+           for row in inside_rows):
+        return data   # komplett innerhalb -> unverändert ausliefern
+
+    dec = png_decode(data)
+    if dec is None:
+        return data  # nicht dekodierbar -> unverändert ausliefern
+    w, h, bpp, px = dec
+    if w != 256 or h != 256 or bpp not in (3, 4):
+        return data  # unerwartetes Format -> unverändert
+    out = bytearray(256 * 256 * 4)
+    for r in range(256):
+        mask = bytearray(256)
+        for a, b in inside_rows[r]:
+            for c in range(max(0, math.ceil(a - 0.5)), min(256, math.floor(b + 0.5))):
+                mask[c] = 1
+        sbase = r * 256 * bpp
+        dbase = r * 256 * 4
+        for c in range(256):
+            if not mask[c]:
+                continue
+            si = sbase + c * bpp
+            di = dbase + c * 4
+            out[di:di + 3] = px[si:si + 3]
+            out[di + 3] = px[si + 3] if bpp == 4 else 255
+    return png_encode_rgba(256, 256, out)
 
 
 def source_url(layer_cfg: dict, z: int, x: int, y: int) -> str:
@@ -414,8 +542,22 @@ class TileHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(502, explain='Ungültige Antwort vom Server')
             return
 
-        # Vollständig leere (transparente) Kachel -> als fehlend behandeln,
-        # damit das Frontend eine gröbere Zoomstufe hochskalieren kann.
+        # Optional: Inhalt außerhalb der Landesgrenze hart wegschneiden
+        # (z. B. Wasserzeichen-Flächen des MV-Dienstes).
+        mask_state = LAYERS[layer].get('mask')
+        if mask_state:
+            try:
+                masked = mask_png_outside_state(data, mask_state, z, x, y)
+            except Exception as e:
+                logger.error('Maskierung %r %s fehlgeschlagen: %s', layer, (z, x, y), e)
+                masked = data
+            if masked is None:
+                self.send_error(404)  # komplett außerhalb der Landesgrenze
+                return
+            data = masked
+
+        # Vollständig einfarbige (transparente/weiße) Kachel -> als fehlend
+        # behandeln, damit das Frontend eine andere Zoomstufe nutzen kann.
         if png_is_empty(data):
             self.send_error(404)
             return

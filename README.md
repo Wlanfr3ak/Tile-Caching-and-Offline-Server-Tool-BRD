@@ -21,6 +21,9 @@ von anderen Programmen (GIS, MBTiles-Tools, OSM-Viewer) weiterverwendet werden.
   Gebiete ohne Abdeckung sind transparent, nicht weiß (WMS `TRANSPARENT=true`)
 - **Grenzen-Overlay:** Bundesländergrenzen rot + Staatsgrenze blau, per
   Checkbox über allen Layern einblendbar (lokale Geometrien in `data/`)
+- **Landesgrenz-Maskierung:** Kachelinhalte werden pro Layer hart an der
+  echten Landesgrenze geschnitten (`mask`-Option) — Wasserzeichen- und
+  Fremdflächen außerhalb des Landes werden transparent
 - **Batch-Download:** Kacheln für Region oder Kartenausschnitt vollständig laden,
   inkl. Auto-Erkundungs- und Heißluftballon-Modus
 - **Cache-Statistiken:** pro Layer und Zoomstufe (`/stats`)
@@ -70,7 +73,8 @@ Fehlt die Datei, nutzt der Server die eingebauten Defaults bzw.
   "port": 8080,
   "min_zoom": 8,
   "layers": { "<id>": { "type": "wms|xyz", "base|url": "...", "layer": "...",
-                        "max_zoom": 19, "bbox": [s, w, n, e] } }
+                        "max_zoom": 19, "bbox": [s, w, n, e],
+                        "mask": "<Bundesland>" } }
 }
 ```
 

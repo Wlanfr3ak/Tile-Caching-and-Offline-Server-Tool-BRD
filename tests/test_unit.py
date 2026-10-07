@@ -111,6 +111,54 @@ class TestPngIsEmpty(unittest.TestCase):
         self.assertFalse(serve.png_is_empty(b'\x89PNG\r\n\x1a\n' + b'0' * 70000))
 
 
+class TestStateMask(unittest.TestCase):
+    """mask_png_outside_state: Inhalt außerhalb der Landesgrenze wird
+    transparent geschnitten (Wasserzeichen-/Fremdflächen weg)."""
+
+    MV = 'Mecklenburg-Vorpommern'
+
+    def test_polygons_loaded(self):
+        self.assertIn(self.MV, serve.STATE_POLYGONS)
+        self.assertGreater(len(serve.STATE_POLYGONS[self.MV]), 0)
+
+    def test_fully_inside_passthrough(self):
+        # Schwerin z15 liegt komplett innerhalb MV
+        x, y = serve.lat_lon_to_tile_xy(53.63, 11.4, 15)
+        self.assertIs(
+            serve.mask_png_outside_state(pngutil.PNG_WHITE, self.MV, 15, x, y),
+            pngutil.PNG_WHITE)
+
+    def test_fully_outside_returns_none(self):
+        # Berlin liegt nicht in MV
+        x, y = serve.lat_lon_to_tile_xy(52.52, 13.4, 12)
+        self.assertIsNone(
+            serve.mask_png_outside_state(pngutil.PNG_WHITE, self.MV, 12, x, y))
+
+    def test_edge_tile_masks_alpha(self):
+        """Randkachel an der MV-Westgrenze: außen transparent, innen erhalten."""
+        x, y = serve.lat_lon_to_tile_xy(53.87, 10.9, 12)
+        out = serve.mask_png_outside_state(pngutil.PNG_WHITE, self.MV, 12, x, y)
+        self.assertIsInstance(out, bytes)
+        w, h, bpp, px = serve.png_decode(out)
+        self.assertEqual(bpp, 4)
+        n0 = sum(1 for i in range(0, len(px), 4) if px[i + 3] == 0)
+        n255 = sum(1 for i in range(0, len(px), 4) if px[i + 3] == 255)
+        self.assertGreater(n0, 0)
+        self.assertGreater(n255, 0)
+
+    def test_unknown_state_passthrough(self):
+        x, y = serve.lat_lon_to_tile_xy(53.63, 11.4, 15)
+        self.assertIs(
+            serve.mask_png_outside_state(pngutil.PNG_WHITE, 'Atlantis', 15, x, y),
+            pngutil.PNG_WHITE)
+
+    def test_masked_output_is_valid_png(self):
+        x, y = serve.lat_lon_to_tile_xy(53.87, 10.9, 12)
+        out = serve.mask_png_outside_state(pngutil.PNG_REAL, self.MV, 12, x, y)
+        self.assertTrue(out.startswith(b'\x89PNG\r\n\x1a\n'))
+        self.assertIsNotNone(serve.png_decode(out))
+
+
 class TestSourceUrl(unittest.TestCase):
     def test_wms_url(self):
         url = serve.source_url(
