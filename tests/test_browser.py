@@ -278,6 +278,27 @@ class TestVersionBadge(BrowserFixture):
         self.assertLess(box['y'], 100)   # ganz oben
         self.screenshot('version_badge')
 
+    def test_39_download_toggle_button(self):
+        """Download-Panel per Map-Button ein-/ausblenden (Overlay,
+        unabhaengig von der Sidebar)."""
+        btn = self.page.locator('.dl-toggle-btn')
+        self.assertEqual(btn.count(), 1)
+        dl = self.page.locator('#download')
+        self.assertFalse(dl.is_visible())          # zu Beginn zu
+        btn.click()
+        self.wait_settled(300)
+        self.assertTrue(dl.is_visible())
+        # Panel liegt auf der Karte (links vom Sidebar-Rand ~320px)
+        box = dl.bounding_box()
+        self.assertGreaterEqual(box['x'], 320)
+        # Download-Checkboxen sind im Overlay erreichbar
+        n = self.page.locator('#dl-layers input[type=checkbox]').count()
+        self.assertEqual(n, len(serve.LAYERS))
+        btn.click()
+        self.wait_settled(300)
+        self.assertFalse(dl.is_visible())
+        self.screenshot('download_overlay')
+
 
 class TestWorldBasemap(BrowserFixture):
     """Grobe Weltgrundkarte (Länder-Polygone + Namen) unter den Kacheln."""

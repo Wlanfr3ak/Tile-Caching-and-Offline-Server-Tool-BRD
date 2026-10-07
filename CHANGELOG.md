@@ -4,6 +4,27 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.7.0] - 2026-10-08
+
+Download-Panel aus der Sidebar gelöst und als schaltbares Overlay direkt
+auf der Karte — deutlich mehr Platz im linken Bereich.
+(KI: Devin, Modell: SWE-2 High)
+
+### Changed
+
+- **Download-Panel ist jetzt ein Map-Overlay:** Neuer Leaflet-Control-
+  Button „Download" oben links auf der Karte (unter dem Zoom-Control)
+  blendet das Panel ein/aus — unabhängig vom Sidebar-Zustand. Die Sidebar
+  enthält nur noch Cache-Übersicht, Kartenstatus, Punkte und Statistik.
+- Der Button bekommt einen aktiven Zustand (`.active`) solange das Panel
+  offen ist.
+
+### Tests
+
+- `test_39_download_toggle_button`: Button existiert, Panel startet
+  versteckt, wird per Klick sichtbar/unsichtbar, enthält alle
+  Layer-Checkboxen.
+
 ## [1.6.0] - 2026-10-08
 
 UI-Anpassung: Landesgrenzen sind jetzt standardmäßig immer sichtbar, und

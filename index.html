@@ -111,6 +111,22 @@
     summary::-webkit-details-marker { display: none; }
     .section-content { padding: 8px; }
     #overview-summary { margin-bottom: 6px; }
+    /* Download-Panel: schaltbares Overlay direkt auf der Karte (nicht
+       mehr in der Sidebar) -> spart Platz im linken Bereich. */
+    #download {
+      left: 335px; top: 62px; z-index: 1100;
+      max-height: 82%; overflow-y: auto;
+    }
+    #download.open { display: block; }
+    /* Leaflet-Control-Button im Zoom-Control-Stil */
+    .dl-toggle-btn {
+      background: #fff; border: 2px solid rgba(0,0,0,0.2);
+      border-radius: 4px; font: 600 12px/1.4 sans-serif;
+      padding: 6px 10px; cursor: pointer; color: #333;
+      display: block; width: auto;
+    }
+    .dl-toggle-btn:hover { background: #f4f4f4; }
+    .dl-toggle-btn.active { background: #e6f0ff; border-color: #358; }
   </style>
 </head>
 <body>
@@ -258,6 +274,27 @@
     }).setView([53.9, 10.4], 8);
     window.map = map;  // für Debugging/Tests (z. B. map.setView in der Konsole)
     L.control.scale({ imperial: false }).addTo(map);
+
+    // Download-Panel als schaltbares Overlay direkt auf der Karte:
+    // Button sitzt im Leaflet-Control (oben links unter Zoom), das Panel
+    // ist komplett unabhängig von der Sidebar-Ansicht -> spart Platz.
+    const dlPanel = document.getElementById('download');
+    const DlToggleControl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd() {
+        const btn = L.DomUtil.create('button', 'dl-toggle-btn');
+        btn.textContent = 'Download';
+        btn.title = 'Download-Panel ein-/ausblenden';
+        L.DomEvent.disableClickPropagation(btn);
+        L.DomEvent.disableScrollPropagation(btn);
+        L.DomEvent.on(btn, 'click', () => {
+          dlPanel.classList.toggle('open');
+          btn.classList.toggle('active', dlPanel.classList.contains('open'));
+        });
+        return btn;
+      }
+    });
+    map.addControl(new DlToggleControl());
     map.createPane('worldPane');
     map.getPane('worldPane').style.zIndex = 60;
     map.getPane('worldPane').style.pointerEvents = 'none';
@@ -623,8 +660,8 @@ GeoJSON: [${lng.toFixed(6)}, ${lat.toFixed(6)}]</code>
         </div>`;
       sidebar.appendChild(overview);
 
-      const titles = { download: 'Download & Modi', info: 'Kartenstatus', points: 'Geklickte Punkte', stats: 'Cache pro Zoomstufe' };
-      ['download','info','points','stats'].forEach(id => {
+      const titles = { info: 'Kartenstatus', points: 'Geklickte Punkte', stats: 'Cache pro Zoomstufe' };
+      ['info','points','stats'].forEach(id => {
         const panel = document.getElementById(id);
         if (!panel) return;
         const details = document.createElement('details');
