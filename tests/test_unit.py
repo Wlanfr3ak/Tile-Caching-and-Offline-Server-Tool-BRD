@@ -209,7 +209,9 @@ class TestCountCachedTiles(unittest.TestCase):
 class TestLoadConfig(unittest.TestCase):
     def test_layers_present(self):
         for lid in ('dtk5', 'dop20', 'ni_dop20', 'hh_dop', 'hh_dop_u',
-                    'mv_dop', 'mv_dtk10', 'osm'):
+                    'mv_dop', 'mv_dtk10', 'bw_dop', 'by_dop', 'bb_dop',
+                    'be_dop', 'hb_dop', 'he_dop', 'nw_dop', 'rp_dop',
+                    'sl_dop', 'sn_dop', 'st_dop', 'th_dop', 'osm'):
             self.assertIn(lid, serve.LAYERS, f'Layer {lid} fehlt')
 
     def test_no_meta_keys(self):

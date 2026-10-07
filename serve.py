@@ -25,6 +25,7 @@ import os
 import random
 import re
 import socketserver
+import ssl
 import struct
 import sys
 import traceback
@@ -58,7 +59,7 @@ DEFAULT_CONFIG = {
     'port': 8080,
     'min_zoom': 8,
     'user_agent': 'LocalTileViewer/1.0',
-    'default_bbox': [51.2, 6.5, 55.3, 14.6],
+    'default_bbox': [47.2, 5.8, 55.1, 15.1],
     'layers': {
         'dtk5': {
             'type': 'wms',
@@ -117,11 +118,109 @@ DEFAULT_CONFIG = {
             'max_zoom': 18,
             'bbox': [53.05, 10.6, 54.69, 14.42],
         },
+        'bw_dop': {
+            'type': 'wms',
+            'base': 'https://owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C?',
+            'layer': 'IMAGES_DOP_20_RGB',
+            'mask': 'Baden-Württemberg',
+            'max_zoom': 19,
+            'bbox': [47.53, 7.51, 49.79, 10.5],
+        },
+        'by_dop': {
+            'type': 'wms',
+            'base': 'https://geoservices.bayern.de/od/wms/dop/v1/dop20?',
+            'layer': 'by_dop20c',
+            'mask': 'Bayern',
+            'max_zoom': 19,
+            'bbox': [47.27, 8.97, 50.56, 13.84],
+        },
+        'bb_dop': {
+            'type': 'wms',
+            'base': 'https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms?',
+            'layer': 'bebb_dop20c',
+            'mask': 'Brandenburg',
+            'max_zoom': 19,
+            'bbox': [51.36, 11.27, 53.56, 14.77],
+        },
+        'be_dop': {
+            'type': 'wms',
+            'base': 'https://gdi.berlin.de/services/wms/dop_2025_fruehjahr?',
+            'layer': 'dop_2025',
+            'mask': 'Berlin',
+            'max_zoom': 19,
+            'bbox': [52.34, 13.09, 52.69, 13.76],
+        },
+        'hb_dop': {
+            'type': 'wms',
+            'base': 'https://geodienste.bremen.de/wms_dop_lb?',
+            'layer': 'dop10_2025_HB,dop10_2025_BHV',
+            'mask': 'Bremen',
+            'max_zoom': 19,
+            'bbox': [52.95, 8.48, 53.61, 8.99],
+        },
+        'he_dop': {
+            'type': 'wms',
+            'base': 'https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?language=ger&',
+            'layer': 'he_dop_rgb',
+            'mask': 'Hessen',
+            'verify_tls': False,
+            'max_zoom': 19,
+            'bbox': [49.39, 7.77, 51.65, 10.24],
+        },
+        'nw_dop': {
+            'type': 'wms',
+            'base': 'https://www.wms.nrw.de/geobasis/wms_nw_dop?',
+            'layer': 'nw_dop_rgb',
+            'mask': 'Nordrhein-Westfalen',
+            'max_zoom': 19,
+            'bbox': [50.32, 5.87, 52.53, 9.46],
+        },
+        'rp_dop': {
+            'type': 'wms',
+            'base': 'https://geo4.service24.rlp.de/wms/rp_dop20.fcgi?',
+            'layer': 'rp_dop20',
+            'mask': 'Rheinland-Pfalz',
+            'max_zoom': 19,
+            'bbox': [48.97, 6.12, 50.94, 8.51],
+        },
+        'sl_dop': {
+            'type': 'wms',
+            'base': 'https://geoportal.saarland.de/freewms/dop2025?',
+            'layer': 'sl_dop20_rgb',
+            'mask': 'Saarland',
+            'max_zoom': 19,
+            'bbox': [49.11, 6.36, 49.64, 7.4],
+        },
+        'sn_dop': {
+            'type': 'wms',
+            'base': 'https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest?',
+            'layer': 'sn_dop_020',
+            'mask': 'Sachsen',
+            'verify_tls': False,
+            'max_zoom': 19,
+            'bbox': [50.17, 11.87, 51.68, 15.04],
+        },
+        'st_dop': {
+            'type': 'wms',
+            'base': 'https://www.geodatenportal.sachsen-anhalt.de/wss/service/ST_LVermGeo_DOP_WMS_OpenData/guest?',
+            'layer': 'lsa_lvermgeo_dop20_2',
+            'mask': 'Sachsen-Anhalt',
+            'max_zoom': 19,
+            'bbox': [50.94, 10.56, 53.04, 13.19],
+        },
+        'th_dop': {
+            'type': 'wms',
+            'base': 'https://www.geoproxy.geoportal-th.de/geoproxy/services/DOP20?',
+            'layer': 'th_dop',
+            'mask': 'Thüringen',
+            'max_zoom': 19,
+            'bbox': [50.2, 9.88, 51.65, 12.68],
+        },
         'osm': {
             'type': 'xyz',
             'url': 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
             'max_zoom': 19,
-            'bbox': [51.2, 6.5, 55.3, 14.6],
+            'bbox': [47.2, 5.8, 55.1, 15.1],
         },
     },
 }
@@ -166,6 +265,10 @@ TILE_PATTERN = re.compile(r'^/tiles/([a-z0-9_]+)/(\d+)/(\d+)/(\d+)\.png$')
 
 R = 6378137.0
 ORIGIN_SHIFT = math.pi * R
+
+# Geteilter SSL-Kontext für Upstream-Dienste mit defekter/unvollständiger
+# Zertifikatskette; wird nur genutzt wenn ein Layer verify_tls:false setzt.
+_UNVERIFIED_SSL_CTX = ssl._create_unverified_context()
 
 
 def lat_lon_to_tile_xy(lat: float, lon: float, z: int):
@@ -525,8 +628,11 @@ class TileHandler(http.server.SimpleHTTPRequestHandler):
         # Vom Quellserver holen und speichern
         url = source_url(LAYERS[layer], z, x, y)
         req = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
+        # verify_tls:false nur für Dienste mit defekter Zertifikatskette
+        # (z. B. geodienste.sachsen.de, gds-srv.hessen.de).
+        ctx = _UNVERIFIED_SSL_CTX if LAYERS[layer].get('verify_tls') is False else None
         try:
-            with urllib.request.urlopen(req, timeout=30) as response:
+            with urllib.request.urlopen(req, timeout=30, context=ctx) as response:
                 data = response.read()
         except urllib.error.HTTPError as e:
             logger.error("Quellserver HTTP-Fehler %s für %r %s: %s", e.code, layer, (z, x, y), e)

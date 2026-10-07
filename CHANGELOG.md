@@ -4,6 +4,53 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.4.0] - 2026-10-08
+
+Vollständige Deutschland-Abdeckung: alle 16 Bundesländer liegen jetzt als
+parallele Orthophoto-Layer vor, jeweils an der echten Landesgrenze
+maskiert. (KI: Devin, Modell: SWE-2 High)
+
+### Added
+
+- **12 neue Open-Data-DOP-Layer** (alle per GetCapabilities + GetMap
+  verifiziert, EPSG:3857, PNG):
+  - `bw_dop` — ATKIS DOP20 RGB (LGL-BW, `IMAGES_DOP_20_RGB`)
+  - `by_dop` — DOP20 Farbe (Bayer. Vermessungsverwaltung, `by_dop20c`)
+  - `bb_dop` — DOP20c Brandenburg+Berlin, gekachelter MapProxy
+    (`bebb_dop20c`)
+  - `be_dop` — DOP20RGBI 2025 Berlin (`dop_2025`, neue GDI-Berlin-
+    Plattform; alter FIS-Broker-Endpunkt abgeschaltet)
+  - `hb_dop` — DOP10 2025 Bremen + Bremerhaven als kombinierter
+    `LAYERS=dop10_2025_HB,dop10_2025_BHV`-Aufruf
+  - `he_dop` — DOP rgb Hessen (`he_dop_rgb`, direkter lika-services-
+    Endpunkt statt Mapbender-Proxy)
+  - `nw_dop` — DOP NRW (`nw_dop_rgb`, dl-de/zero-2-0)
+  - `rp_dop` — DOP20 Rheinland-Pfalz (`rp_dop20`)
+  - `sl_dop` — DOP20 Saarland 2025 (`sl_dop20_rgb`, freewms-Endpunkt)
+  - `sn_dop` — DOP-RGB Sachsen (`sn_dop_020`)
+  - `st_dop` — ATKIS DOP20 Sachsen-Anhalt (`lsa_lvermgeo_dop20_2`)
+  - `th_dop` — DOP20 Thüringen (`th_dop`)
+- **`verify_tls`-Layer-Option**: `false` deaktiviert die Zertifikats-
+  prüfung für Dienste mit unvollständiger Zertifikatskette
+  (`geodienste.sachsen.de`, `www.gds-srv.hessen.de` — beide senden das
+  Zwischenzertifikat nicht).
+- Alle neuen Layer mit `mask` (harter Schnitt an der Landesgrenze) und
+  eigener `bbox` für die frühe 404-Abdeckungsprüfung.
+- Frontend: 12 neue Checkboxen mit korrekten Attributionen; Regionen-
+  Auswahl im Download-Panel um alle Bundesländer erweitert.
+- `default_bbox` / `COVERAGE_BBOX` auf Gesamtdeutschland erweitert
+  ([47.2, 5.8]–[55.1, 15.1]).
+- 12 neue echte Upstream-Tests (`test_real_*_dop`, je eine Kachel an einem
+  Stadtzentrum pro Bundesland).
+
+### Fixed
+
+- Test-Mocks akzeptieren den neuen `context`-Parameter von `urlopen`.
+
+### Changed
+
+- `VERSION` → `1.4.0` (Browser-Cache-Busting via `?v=` greift automatisch).
+
 ## [1.3.0] - 2026-10-07
 
 Harte Landesgrenz-Maskierung: Kachelinhalte außerhalb der Grenze des

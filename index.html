@@ -113,6 +113,18 @@
         <option value="ni">Ganz Niedersachsen</option>
         <option value="hh">Ganz Hamburg</option>
         <option value="mv">Ganz Mecklenburg-Vorpommern</option>
+        <option value="bw">Ganz Baden-Württemberg</option>
+        <option value="by">Ganz Bayern</option>
+        <option value="bb">Ganz Brandenburg</option>
+        <option value="be">Ganz Berlin</option>
+        <option value="hb">Ganz Bremen</option>
+        <option value="he">Ganz Hessen</option>
+        <option value="nw">Ganz Nordrhein-Westfalen</option>
+        <option value="rp">Ganz Rheinland-Pfalz</option>
+        <option value="sl">Ganz Saarland</option>
+        <option value="sn">Ganz Sachsen</option>
+        <option value="st">Ganz Sachsen-Anhalt</option>
+        <option value="th">Ganz Thüringen</option>
       </select>
     </label>
     <button id="estimate">Anzahl schätzen</button>
@@ -159,8 +171,20 @@
       ni: [51.3, 6.6, 54.0, 11.6],
       hh: [53.39, 9.72, 53.76, 10.35],
       mv: [53.05, 10.6, 54.69, 14.42],
+      bw: [47.53, 7.51, 49.79, 10.5],
+      by: [47.27, 8.97, 50.56, 13.84],
+      bb: [51.36, 11.27, 53.56, 14.77],
+      be: [52.34, 13.09, 52.69, 13.76],
+      hb: [52.95, 8.48, 53.61, 8.99],
+      he: [49.39, 7.77, 51.65, 10.24],
+      nw: [50.32, 5.87, 52.53, 9.46],
+      rp: [48.97, 6.12, 50.94, 8.51],
+      sl: [49.11, 6.36, 49.64, 7.4],
+      sn: [50.17, 11.87, 51.68, 15.04],
+      st: [50.94, 10.56, 53.04, 13.19],
+      th: [50.2, 9.88, 51.65, 12.68],
     };
-    const COVERAGE_BBOX = [51.2, 6.5, 55.3, 14.6];
+    const COVERAGE_BBOX = [47.2, 5.8, 55.1, 15.1];
 
     // Server-Version (vom Server in index.html eingesetzt) als Cache-Buster:
     // neue Version -> neue Tile-URLs -> der Browser lädt wirklich neu statt
@@ -172,6 +196,18 @@
     const ATTR_NI = '&copy; <a href="https://www.lgln.niedersachsen.de">LGLN</a> / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
     const ATTR_HH = '&copy; Freie und Hansestadt Hamburg, LGV / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
     const ATTR_MV = '&copy; GeoBasis-DE/LVermGeo M-V / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_BW = '&copy; LGL Baden-Württemberg / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_BY = '&copy; Bayerische Vermessungsverwaltung / <a href="https://creativecommons.org/licenses/by/4.0/deed.de">CC BY 4.0</a>';
+    const ATTR_BB = '&copy; GeoBasis-DE/LGB / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_BE = '&copy; Senatsverwaltung Berlin / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_HB = '&copy; Freie Hansestadt Bremen (LGeoI) / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_HE = '&copy; HVBG Hessen / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_NW = '&copy; <a href="https://www.bezreg-koeln.nrw.de/geobasis-nrw">Geobasis NRW</a> / <a href="https://www.govdata.de/dl-de/zero-2-0">dl-de/zero-2-0</a>';
+    const ATTR_RP = '&copy; GeoBasis-DE/LVermGeoRP / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_SL = '&copy; LVGL Saarland / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_SN = '&copy; GeoSN / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_ST = '&copy; LVermGeo Sachsen-Anhalt / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
+    const ATTR_TH = '&copy; GDI-Th / <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a>';
     const ATTR_OSM = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
     const LAYER_DEFS = [
@@ -182,6 +218,18 @@
       { id: 'hh_dop_u', label: 'DOP Orthophoto unbelaubt (HH)',short: 'HH-DOPu',maxNative: 19, max: 19, attribution: ATTR_HH,  checked: false },
       { id: 'mv_dop',   label: 'DOP Orthophoto (MV)',          short: 'MV-DOP', maxNative: 19, max: 19, attribution: ATTR_MV,  checked: false },
       { id: 'mv_dtk10', label: 'DTK10 Topographie (MV)',       short: 'MV-DTK', min: 15, maxNative: 18, max: 18, attribution: ATTR_MV,  checked: false },
+      { id: 'bw_dop',   label: 'DOP20 Orthophoto (BW)',        short: 'BW-DOP', maxNative: 19, max: 19, attribution: ATTR_BW,  checked: false },
+      { id: 'by_dop',   label: 'DOP20 Orthophoto (BY)',        short: 'BY-DOP', maxNative: 19, max: 19, attribution: ATTR_BY,  checked: false },
+      { id: 'bb_dop',   label: 'DOP20 Orthophoto (BB+BE)',     short: 'BB-DOP', maxNative: 19, max: 19, attribution: ATTR_BB,  checked: false },
+      { id: 'be_dop',   label: 'DOP20 Orthophoto (BE)',        short: 'BE-DOP', maxNative: 19, max: 19, attribution: ATTR_BE,  checked: false },
+      { id: 'hb_dop',   label: 'DOP10 Orthophoto (HB)',        short: 'HB-DOP', maxNative: 19, max: 19, attribution: ATTR_HB,  checked: false },
+      { id: 'he_dop',   label: 'DOP Orthophoto (HE)',          short: 'HE-DOP', maxNative: 19, max: 19, attribution: ATTR_HE,  checked: false },
+      { id: 'nw_dop',   label: 'DOP Orthophoto (NW)',          short: 'NW-DOP', maxNative: 19, max: 19, attribution: ATTR_NW,  checked: false },
+      { id: 'rp_dop',   label: 'DOP20 Orthophoto (RP)',        short: 'RP-DOP', maxNative: 19, max: 19, attribution: ATTR_RP,  checked: false },
+      { id: 'sl_dop',   label: 'DOP20 Orthophoto (SL)',        short: 'SL-DOP', maxNative: 19, max: 19, attribution: ATTR_SL,  checked: false },
+      { id: 'sn_dop',   label: 'DOP20 Orthophoto (SN)',        short: 'SN-DOP', maxNative: 19, max: 19, attribution: ATTR_SN,  checked: false },
+      { id: 'st_dop',   label: 'DOP20 Orthophoto (ST)',        short: 'ST-DOP', maxNative: 19, max: 19, attribution: ATTR_ST,  checked: false },
+      { id: 'th_dop',   label: 'DOP20 Orthophoto (TH)',        short: 'TH-DOP', maxNative: 19, max: 19, attribution: ATTR_TH,  checked: false },
       { id: 'osm',      label: 'OpenStreetMap',                short: 'OSM',    maxNative: 19, max: 19, attribution: ATTR_OSM, checked: false },
     ];
     const LAYER_IDS = LAYER_DEFS.map(l => l.id);

@@ -36,7 +36,7 @@ _real_urlopen = urllib.request.urlopen
 
 def fake_urlopen_factory(payload=PNG_REAL):
     """Mockt nur Upstream-Abrufe; localhost-Requests gehen durch."""
-    def _fake(req, timeout=30):
+    def _fake(req, timeout=30, context=None):
         url = req.full_url if hasattr(req, 'full_url') else str(req)
         if '127.0.0.1' in url or 'localhost' in url:
             return _real_urlopen(req, timeout=timeout)
@@ -45,7 +45,7 @@ def fake_urlopen_factory(payload=PNG_REAL):
 
 
 def fake_urlopen_error_factory():
-    def _fake(req, timeout=30):
+    def _fake(req, timeout=30, context=None):
         url = req.full_url if hasattr(req, 'full_url') else str(req)
         if '127.0.0.1' in url or 'localhost' in url:
             return _real_urlopen(req, timeout=timeout)
@@ -331,6 +331,49 @@ class TestRealUpstream(ServerFixture):
     def test_real_mv_dtk10_z15(self):
         r = self.get('/tiles/mv_dtk10/15/17485/10600.png', timeout=90)
         self.assertEqual(r.status, 200)
+
+    def _check_real(self, layer, lat, lon, z=12):
+        """Echte Kachel für Stadtzentrum lat/lon abrufen (Status 200, PNG)."""
+        x, y = serve.lat_lon_to_tile_xy(lat, lon, z)
+        r = self.get(f'/tiles/{layer}/{z}/{x}/{y}.png', timeout=90)
+        self.assertEqual(r.status, 200, f'{layer} z{z}/{x}/{y}')
+        self.assertTrue(r.read().startswith(b'\x89PNG'), layer)
+
+    def test_real_bw_dop(self):
+        self._check_real('bw_dop', 48.776, 9.183)     # Stuttgart
+
+    def test_real_by_dop(self):
+        self._check_real('by_dop', 48.137, 11.576)    # Muenchen
+
+    def test_real_bb_dop(self):
+        self._check_real('bb_dop', 52.394, 13.064)    # Potsdam
+
+    def test_real_be_dop(self):
+        self._check_real('be_dop', 52.520, 13.405)    # Berlin Mitte
+
+    def test_real_hb_dop(self):
+        self._check_real('hb_dop', 53.075, 8.807)     # Bremen
+
+    def test_real_he_dop(self):
+        self._check_real('he_dop', 50.110, 8.682)     # Frankfurt
+
+    def test_real_nw_dop(self):
+        self._check_real('nw_dop', 51.456, 7.016)     # Wuppertal
+
+    def test_real_rp_dop(self):
+        self._check_real('rp_dop', 49.993, 8.271)     # Mainz
+
+    def test_real_sl_dop(self):
+        self._check_real('sl_dop', 49.234, 7.000)     # Saarbruecken
+
+    def test_real_sn_dop(self):
+        self._check_real('sn_dop', 51.050, 13.737)    # Dresden
+
+    def test_real_st_dop(self):
+        self._check_real('st_dop', 52.127, 11.627)    # Magdeburg
+
+    def test_real_th_dop(self):
+        self._check_real('th_dop', 50.978, 11.029)    # Erfurt
 
 
 if __name__ == '__main__':

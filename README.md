@@ -44,7 +44,24 @@ von anderen Programmen (GIS, MBTiles-Tools, OSM-Viewer) weiterverwendet werden.
 | `hh_dop_u`  | DOP-Zeitreihe unbelaubt Hamburg           | FHH / LGV                       |
 | `mv_dop`    | DOP Orthophotos Mecklenburg-Vorpommern    | LAiV M-V                        |
 | `mv_dtk10`  | DTK10 Topographie Mecklenburg-Vorpommern  | LAiV M-V                        |
+| `bw_dop`    | DOP20 Orthophotos Baden-Württemberg       | LGL-BW                          |
+| `by_dop`    | DOP20 Orthophotos Bayern                  | Bayerische Vermessungsverwaltung|
+| `bb_dop`    | DOP20 Orthophotos Brandenburg (+ Berlin)  | GeoBasis-DE/LGB                 |
+| `be_dop`    | DOP20 Orthophotos Berlin 2025             | SenSBW Berlin                   |
+| `hb_dop`    | DOP10 Orthophotos Bremen + Bremerhaven    | FHB GeoInformation              |
+| `he_dop`    | DOP Orthophotos Hessen                    | HVBG                            |
+| `nw_dop`    | DOP Orthophotos Nordrhein-Westfalen       | Geobasis NRW                    |
+| `rp_dop`    | DOP20 Orthophotos Rheinland-Pfalz         | LVermGeo RP                     |
+| `sl_dop`    | DOP20 Orthophotos Saarland 2025           | LVGL Saarland                   |
+| `sn_dop`    | DOP20 Orthophotos Sachsen                 | GeoSN                           |
+| `st_dop`    | DOP20 Orthophotos Sachsen-Anhalt          | LVermGeo LSA                    |
+| `th_dop`    | DOP20 Orthophotos Thüringen               | GDI-Th / TLVermGeo              |
 | `osm`       | OpenStreetMap                             | OSM / tile.openstreetmap.org    |
+
+Damit sind **alle 16 Bundesländer** mit Orthophotos abgedeckt (jeweils an der
+echten Landesgrenze maskiert). Hinweis: Die Dienste von Sachsen und Hessen
+senden unvollständige TLS-Zertifikatsketten — für sie ist in der Konfiguration
+`verify_tls: false` gesetzt (nur für diese Hosts).
 
 Details und Lizenzen siehe [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 

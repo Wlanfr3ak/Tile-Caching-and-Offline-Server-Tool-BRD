@@ -6,7 +6,7 @@
   "user_agent": "LocalTileViewer/1.0",
   "default_bbox": [51.2, 6.5, 55.3, 14.6],
   "layers": {
-    "_schema": "Pro Layer: type=wms|xyz; wms: base+layer, xyz: url-Template; optional min_zoom, max_zoom, bbox [s,w,n,e], transparent (Standard: true), mask=<Bundeslandname aus data/bundeslaender.geo.json> (Inhalt ausserhalb der Landesgrenze wird transparent geschnitten)",
+    "_schema": "Pro Layer: type=wms|xyz; wms: base+layer, xyz: url-Template; optional min_zoom, max_zoom, bbox [s,w,n,e], transparent (Standard: true), mask=<Bundeslandname aus data/bundeslaender.geo.json> (Inhalt ausserhalb der Landesgrenze wird transparent geschnitten), verify_tls=false (nur fuer Dienste mit defekter Zertifikatskette)",
     "dtk5": {
       "type": "wms",
       "base": "https://service.gdi-sh.de/WMS_SH_DTK5_OpenGBD?",
@@ -70,6 +70,116 @@
       "max_zoom": 18,
       "bbox": [53.05, 10.6, 54.69, 14.42],
       "_comment": "MV Digitale Topographische Karte 1:10000 - LAiV M-V, dl-de/by-2-0"
+    },
+    "bw_dop": {
+      "type": "wms",
+      "base": "https://owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C?",
+      "layer": "IMAGES_DOP_20_RGB",
+      "mask": "Baden-Württemberg",
+      "max_zoom": 19,
+      "bbox": [47.53, 7.51, 49.79, 10.5],
+      "_comment": "BW ATKIS DOP20 RGB - LGL-BW, dl-de/by-2-0"
+    },
+    "by_dop": {
+      "type": "wms",
+      "base": "https://geoservices.bayern.de/od/wms/dop/v1/dop20?",
+      "layer": "by_dop20c",
+      "mask": "Bayern",
+      "max_zoom": 19,
+      "bbox": [47.27, 8.97, 50.56, 13.84],
+      "_comment": "BY DOP20 Farbe - Bayerische Vermessungsverwaltung, CC BY 4.0"
+    },
+    "bb_dop": {
+      "type": "wms",
+      "base": "https://isk.geobasis-bb.de/mapproxy/dop20c/service/wms?",
+      "layer": "bebb_dop20c",
+      "mask": "Brandenburg",
+      "max_zoom": 19,
+      "bbox": [51.36, 11.27, 53.56, 14.77],
+      "_comment": "BB+BE DOP20 Farbe (gekachelter Dienst) - GeoBasis-DE/LGB, dl-de/by-2-0"
+    },
+    "be_dop": {
+      "type": "wms",
+      "base": "https://gdi.berlin.de/services/wms/dop_2025_fruehjahr?",
+      "layer": "dop_2025",
+      "mask": "Berlin",
+      "max_zoom": 19,
+      "bbox": [52.34, 13.09, 52.69, 13.76],
+      "_comment": "BE DOP20RGBI Fruehjahr 2025 - SenSBW Berlin, dl-de/by-2-0"
+    },
+    "hb_dop": {
+      "type": "wms",
+      "base": "https://geodienste.bremen.de/wms_dop_lb?",
+      "layer": "dop10_2025_HB,dop10_2025_BHV",
+      "mask": "Bremen",
+      "max_zoom": 19,
+      "bbox": [52.95, 8.48, 53.61, 8.99],
+      "_comment": "HB DOP10 2025 (Bremen + Bremerhaven kombiniert) - FHB GeoInformation, dl-de/by-2-0"
+    },
+    "he_dop": {
+      "type": "wms",
+      "base": "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?language=ger&",
+      "layer": "he_dop_rgb",
+      "mask": "Hessen",
+      "verify_tls": false,
+      "max_zoom": 19,
+      "bbox": [49.39, 7.77, 51.65, 10.24],
+      "_comment": "HE DOP rgb - HVBG (Server sendet unvollst. Zertifikatskette), kostenfrei HVGG"
+    },
+    "nw_dop": {
+      "type": "wms",
+      "base": "https://www.wms.nrw.de/geobasis/wms_nw_dop?",
+      "layer": "nw_dop_rgb",
+      "mask": "Nordrhein-Westfalen",
+      "max_zoom": 19,
+      "bbox": [50.32, 5.87, 52.53, 9.46],
+      "_comment": "NW DOP - Geobasis NRW, dl-de/zero-2-0"
+    },
+    "rp_dop": {
+      "type": "wms",
+      "base": "https://geo4.service24.rlp.de/wms/rp_dop20.fcgi?",
+      "layer": "rp_dop20",
+      "mask": "Rheinland-Pfalz",
+      "max_zoom": 19,
+      "bbox": [48.97, 6.12, 50.94, 8.51],
+      "_comment": "RP DOP20 - LVermGeo RLP, dl-de/by-2-0"
+    },
+    "sl_dop": {
+      "type": "wms",
+      "base": "https://geoportal.saarland.de/freewms/dop2025?",
+      "layer": "sl_dop20_rgb",
+      "mask": "Saarland",
+      "max_zoom": 19,
+      "bbox": [49.11, 6.36, 49.64, 7.4],
+      "_comment": "SL DOP20 2025 - LVGL Saarland, dl-de/by-2-0"
+    },
+    "sn_dop": {
+      "type": "wms",
+      "base": "https://geodienste.sachsen.de/wms_geosn_dop-rgb/guest?",
+      "layer": "sn_dop_020",
+      "mask": "Sachsen",
+      "verify_tls": false,
+      "max_zoom": 19,
+      "bbox": [50.17, 11.87, 51.68, 15.04],
+      "_comment": "SN DOP-RGB - GeoSN (Server sendet unvollst. Zertifikatskette), dl-de/by-2-0"
+    },
+    "st_dop": {
+      "type": "wms",
+      "base": "https://www.geodatenportal.sachsen-anhalt.de/wss/service/ST_LVermGeo_DOP_WMS_OpenData/guest?",
+      "layer": "lsa_lvermgeo_dop20_2",
+      "mask": "Sachsen-Anhalt",
+      "max_zoom": 19,
+      "bbox": [50.94, 10.56, 53.04, 13.19],
+      "_comment": "ST ATKIS DOP20 OpenData - LVermGeo LSA, dl-de/by-2-0"
+    },
+    "th_dop": {
+      "type": "wms",
+      "base": "https://www.geoproxy.geoportal-th.de/geoproxy/services/DOP20?",
+      "layer": "th_dop",
+      "mask": "Thüringen",
+      "max_zoom": 19,
+      "bbox": [50.2, 9.88, 51.65, 12.68],
+      "_comment": "TH DOP20 - GDI-Th/TLVermGeo, dl-de/by-2-0"
     },
     "osm": {
       "type": "xyz",
