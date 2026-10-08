@@ -139,7 +139,7 @@ DEFAULT_CONFIG = {
             'layer': 'dop_zeitreihe_belaubt',
             'mask': 'Hamburg',
             'max_zoom': 19,
-            'bbox': [53.39, 9.72, 53.76, 10.35],
+            'bbox': [53.39, 8.10, 54.03, 10.35],
         },
         'hh_dop_u': {
             'type': 'wms',
@@ -147,7 +147,7 @@ DEFAULT_CONFIG = {
             'layer': 'dop_zeitreihe_unbelaubt',
             'mask': 'Hamburg',
             'max_zoom': 19,
-            'bbox': [53.39, 9.72, 53.76, 10.35],
+            'bbox': [53.39, 8.10, 54.03, 10.35],
         },
         'mv_dop': {
             'type': 'wms',
@@ -155,7 +155,7 @@ DEFAULT_CONFIG = {
             'layer': 'mv_dop',
             'mask': 'Mecklenburg-Vorpommern',
             'max_zoom': 19,
-            'bbox': [53.05, 10.6, 54.69, 14.42],
+            'bbox': [53.05, 10.6, 54.72, 14.42],
         },
         'mv_dtk10': {
             'type': 'wms',
@@ -164,7 +164,7 @@ DEFAULT_CONFIG = {
             'mask': 'Mecklenburg-Vorpommern',
             'min_zoom': 15,
             'max_zoom': 18,
-            'bbox': [53.05, 10.6, 54.69, 14.42],
+            'bbox': [53.05, 10.6, 54.72, 14.42],
         },
         'bw_dop': {
             'type': 'wms',
@@ -204,7 +204,7 @@ DEFAULT_CONFIG = {
             'layer': 'dop10_2025_HB,dop10_2025_BHV',
             'mask': 'Bremen',
             'max_zoom': 19,
-            'bbox': [52.95, 8.48, 53.61, 8.99],
+            'bbox': [52.95, 8.48, 53.63, 8.99],
         },
         'he_dop': {
             'type': 'wms',

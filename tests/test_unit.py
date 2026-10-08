@@ -159,6 +159,100 @@ class TestStateMask(unittest.TestCase):
         self.assertIsNotNone(serve.png_decode(out))
 
 
+def _point_in_rings(lon: float, lat: float, rings: list) -> bool:
+    """Ray-Casting mit Paritätsregel — selbe Semantik wie die
+    Scanline-Füllung in serve.mask_png_outside_state."""
+    xs = []
+    for ring in rings:
+        m = len(ring)
+        for i in range(m):
+            x1, y1 = ring[i]
+            x2, y2 = ring[(i + 1) % m]
+            if (y1 <= lat < y2) or (y2 <= lat < y1):
+                xs.append(x1 + (lat - y1) * (x2 - x1) / (y2 - y1))
+    return sum(1 for x in xs if x > lon) % 2 == 1
+
+
+class TestStateGeometryCoverage(unittest.TestCase):
+    """Pflicht-Orte müssen innerhalb ihrer Landesgeometrie liegen —
+    insbesondere Exklaven und Inseln (fingen früher leise raus:
+    Bremerhaven fehlte komplett, Büsingen/Neuwerk lagen außerhalb der
+    zu grob vereinfachten Polygone des alten Datensatzes)."""
+
+    # (Bundesland, lon, lat, Ortsname)
+    COVERAGE_POINTS = [
+        ('Baden-Württemberg', 9.183, 48.776, 'Stuttgart'),
+        ('Baden-Württemberg', 8.689, 47.697, 'Büsingen (Exklave in CH)'),
+        ('Bayern', 11.576, 48.137, 'München'),
+        ('Berlin', 13.405, 52.520, 'Berlin-Mitte'),
+        ('Brandenburg', 13.064, 52.394, 'Potsdam'),
+        ('Bremen', 8.807, 53.075, 'Bremen-Stadt'),
+        ('Bremen', 8.580, 53.539, 'Bremerhaven'),
+        ('Hamburg', 9.990, 53.550, 'Hamburg-Mitte'),
+        ('Hamburg', 8.496, 53.916, 'Neuwerk (Exklave)'),
+        ('Hamburg', 8.445, 53.959, 'Scharhörn (Exklave)'),
+        ('Hessen', 8.682, 50.110, 'Frankfurt'),
+        ('Mecklenburg-Vorpommern', 11.400, 53.630, 'Schwerin'),
+        ('Mecklenburg-Vorpommern', 13.400, 54.420, 'Rügen'),
+        ('Mecklenburg-Vorpommern', 13.124, 54.567, 'Hiddensee-Vitte'),
+        ('Mecklenburg-Vorpommern', 11.430, 53.990, 'Poel'),
+        ('Mecklenburg-Vorpommern', 13.910, 54.030, 'Greifswalder Oie'),
+        ('Niedersachsen', 9.740, 52.370, 'Hannover'),
+        ('Niedersachsen', 6.670, 53.588, 'Borkum'),
+        ('Niedersachsen', 6.998, 53.678, 'Juist'),
+        ('Niedersachsen', 6.917, 53.672, 'Memmert'),
+        ('Niedersachsen', 7.149, 53.713, 'Norderney'),
+        ('Niedersachsen', 7.400, 53.725, 'Baltrum'),
+        ('Niedersachsen', 7.475, 53.747, 'Langeoog'),
+        ('Niedersachsen', 7.750, 53.770, 'Spiekeroog'),
+        ('Niedersachsen', 7.905, 53.790, 'Wangerooge'),
+        ('Niedersachsen', 8.170, 53.717, 'Mellum'),
+        ('Niedersachsen', 8.166, 53.763, 'Langlütjen I'),
+        ('Nordrhein-Westfalen', 7.016, 51.456, 'Wuppertal'),
+        ('Rheinland-Pfalz', 8.271, 49.993, 'Mainz'),
+        ('Saarland', 7.000, 49.234, 'Saarbrücken'),
+        ('Sachsen', 13.737, 51.050, 'Dresden'),
+        ('Sachsen-Anhalt', 11.627, 52.127, 'Magdeburg'),
+        ('Schleswig-Holstein', 7.890, 54.182, 'Helgoland'),
+        ('Schleswig-Holstein', 8.310, 54.910, 'Sylt'),
+        ('Schleswig-Holstein', 8.500, 54.720, 'Föhr'),
+        ('Schleswig-Holstein', 8.355, 54.648, 'Amrum'),
+        ('Schleswig-Holstein', 8.630, 54.520, 'Pellworm'),
+        ('Schleswig-Holstein', 8.550, 54.570, 'Hallig Hooge'),
+        ('Schleswig-Holstein', 11.134, 54.474, 'Fehmarn'),
+        ('Thüringen', 11.029, 50.978, 'Erfurt'),
+    ]
+
+    def test_all_required_points_inside(self):
+        fails = []
+        for state, lon, lat, name in self.COVERAGE_POINTS:
+            rings = serve.STATE_POLYGONS.get(state)
+            self.assertIsNotNone(rings, f'Land {state} fehlt in STATE_POLYGONS')
+            if not _point_in_rings(lon, lat, rings):
+                fails.append(f'{name} ({lat}, {lon}) nicht in {state}')
+        self.assertEqual(fails, [], 'Orte außerhalb ihrer Landesgeometrie:\n  '
+                         + '\n  '.join(fails))
+
+    def test_outside_points_rejected(self):
+        """Negativ-Punkte: klare Auslandspunkte dürfen nicht drin liegen."""
+        for state, lon, lat, name in [
+            ('Mecklenburg-Vorpommern', 12.57, 55.68, 'Kopenhagen'),
+            ('Baden-Württemberg', 7.59, 47.56, 'Basel'),
+            ('Bayern', 14.29, 48.30, 'Linz'),
+        ]:
+            self.assertFalse(
+                _point_in_rings(lon, lat, serve.STATE_POLYGONS[state]),
+                f'{name} fälschlich in {state}')
+
+    def test_all_masks_have_geometry(self):
+        """Jeder mask-Wert in den Layer-Configs muss eine Geometrie haben."""
+        for lid, cfg in serve.LAYERS.items():
+            mask = cfg.get('mask')
+            if mask:
+                self.assertIn(mask, serve.STATE_POLYGONS,
+                              f'{lid}: mask "{mask}" ohne Geometrie')
+
+
 class TestSourceUrl(unittest.TestCase):
     def test_wms_url(self):
         url = serve.source_url(

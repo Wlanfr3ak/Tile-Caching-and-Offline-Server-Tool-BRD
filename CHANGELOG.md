@@ -4,6 +4,59 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/),
 Versionierung: [Semantic Versioning](https://semver.org/lang/de/).
 
+## [1.8.1] - 2026-10-08
+
+Bugfix: Landesgrenz-Geometrien komplett neu aus OpenStreetMap — der alte
+Datensatz ließ Bremerhaven, Neuwerk/Scharhörn und Büsingen (teils)
+unter den Tisch fallen, wodurch dort keine Umrandung gezeichnet und per
+`mask` alle Orthofotos weggeschnitten wurden.
+(KI: Devin, Modell: SWE-2 High)
+
+### Changed
+
+- **`data/bundeslaender.geo.json` neu generiert aus OSM
+  admin_level=4-Relationen** (via Nominatim, Douglas-Peucker-vereinfacht
+  auf ~0,0005–0,008° je nach Landesgröße). Der bisherige Datensatz
+  (isellsoap/deutschlandGeoJSON, Basis GADM) ließ in allen
+  Auflösungsstufen u. a. komplett Bremerhaven weg und vereinfachte
+  Büsingen/Neuwerk/Inseln so grob, dass Ortszentren außerhalb des
+  Polygons lagen. Die neuen Geometrien enthalten die echten
+  Landesgrenzen inkl. aller Exklaven, Inseln und Seegrenzen —
+  dadurch verläuft die rote Grenzlinie an den Küsten jetzt auch im
+  Wattenmeer/auf der Ostsee (amtlicher Grenzverlauf).
+- **Lizenz der Ländergrenzen wechselt zu ODbL** (© OpenStreetMap
+  contributors); `data/deutschland.geo.json` (Staatsgrenze) bleibt
+  deutschlandGeoJSON. `THIRD_PARTY_LICENSES.md` entsprechend
+  aktualisiert.
+
+### Fixed
+
+- **Bremerhaven gehört jetzt zum Bremen-Polygon** — vorher keine
+  Umrandung und `mask: "Bremen"` schnitt alle `hb_dop`-Orthofotos in
+  Bremerhaven weg (404).
+- **Neuwerk & Scharhörn in Hamburg-Geometrie** — die Hamburger
+  Exklaven in der Elbmündung fehlten komplett.
+- **Büsingen** war im alten Datensatz nur als grobes 8-Eck enthalten,
+  das das Ortszentrum ausschloss — jetzt exakte Exklaven-Grenze.
+- **Insel-Polygone verfeinert** (Norderney, Hiddensee u. a. lagen mit
+  ihren Orten knapp außerhalb der alten Mini-Polygone).
+- **Layer-BBoxen:** `hh_dop`/`hh_dop_u` erweitert
+  (…, 8.10, 54.03, … — Neuwerk lag außerhalb), `mv_dop`/`mv_dtk10` und
+  `hb_dop` leicht nach Norden erweitert (Rügen-Nordkap bzw.
+  Bremerhaven-Nordspitze); `serve.py`, `config.example.json` und
+  `REGION_BBOXES` in `index.html` synchron gehalten.
+
+### Tests
+
+- Neue Klasse `TestStateGeometryCoverage` in `tests/test_unit.py`:
+  Pflicht-Orte pro Land (Landeshauptstädte, alle bewohnten Inseln,
+  Exklaven Büsingen/Neuwerk/Scharhörn/Bremerhaven) müssen innerhalb
+  ihrer Landesgeometrie liegen (Point-in-Polygon, Paritätsregel),
+  plus Negativ-Punkte (Kopenhagen, Basel, Linz) und ein
+  Konsistenz-Check `mask`-Name ↔ Geometrie.
+- `test_real_hb_dop`: zusätzlicher Testpunkt Bremerhaven (53.539, 8.580)
+  neben dem bisherigen Punkt Bremen (53.075, 8.807).
+
 ## [1.8.0] - 2026-10-08
 
 Versions-Badge mit GitHub-Link und serverseitigem Update-Check;

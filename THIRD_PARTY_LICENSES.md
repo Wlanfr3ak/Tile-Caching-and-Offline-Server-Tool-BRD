@@ -10,7 +10,8 @@ Abhängigkeit oder Datenquelle wird hier in derselben Änderung aktualisiert.
 |-------------------|---------|-------------------------------------------------|---------------------------------------------|
 | Python            | ≥ 3.10  | https://www.python.org                          | PSF License                                 |
 | Leaflet           | 1.9.4   | https://leafletjs.com (`lib/leaflet.js`, vendored) | BSD-2-Clause                              |
-| deutschlandGeoJSON (Bundesländer-/Staatsgrenzen) | 3_mittel | https://github.com/isellsoap/deutschlandGeoJSON (`data/`, vendored) | Unlicense (Public Domain); Basis: BKG VG250, dl-de/by-2-0 |
+| deutschlandGeoJSON (deutsche Staatsgrenze, `data/deutschland.geo.json`) | 3_mittel | https://github.com/isellsoap/deutschlandGeoJSON (`data/`, vendored) | Unlicense (Public Domain); Basis: BKG VG250, dl-de/by-2-0 |
+| OpenStreetMap (Bundesländergrenzen, `data/bundeslaender.geo.json` — admin_level=4-Relationen via Nominatim, Douglas-Peucker-vereinfacht) | 2026-10 | https://www.openstreetmap.org | ODbL; © OpenStreetMap contributors |
 | world.geo.json / Natural Earth 110m (Welt-Ländergrenzen) | — | https://github.com/johan/world.geo.json (`data/world_countries.geo.json`, vendored, auf `name`+2-Nachkommastellen reduziert) | Public Domain (Natural Earth) |
 | GitHub Actions    | —       | `actions/checkout`, `softprops/action-gh-release` | MIT / siehe jeweiliges Action-Repo         |
 

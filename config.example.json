@@ -40,7 +40,7 @@
       "layer": "dop_zeitreihe_belaubt",
       "mask": "Hamburg",
       "max_zoom": 19,
-      "bbox": [53.39, 9.72, 53.76, 10.35],
+      "bbox": [53.39, 8.10, 54.03, 10.35],
       "_comment": "HH DOP Zeitreihe belaubt - FHH/LGV, dl-de/by-2-0"
     },
     "hh_dop_u": {
@@ -49,7 +49,7 @@
       "layer": "dop_zeitreihe_unbelaubt",
       "mask": "Hamburg",
       "max_zoom": 19,
-      "bbox": [53.39, 9.72, 53.76, 10.35],
+      "bbox": [53.39, 8.10, 54.03, 10.35],
       "_comment": "HH DOP Zeitreihe unbelaubt - FHH/LGV, dl-de/by-2-0"
     },
     "mv_dop": {
@@ -58,7 +58,7 @@
       "layer": "mv_dop",
       "mask": "Mecklenburg-Vorpommern",
       "max_zoom": 19,
-      "bbox": [53.05, 10.6, 54.69, 14.42],
+      "bbox": [53.05, 10.6, 54.72, 14.42],
       "_comment": "MV Digitale Orthophotos - LAiV M-V, dl-de/by-2-0"
     },
     "mv_dtk10": {
@@ -68,7 +68,7 @@
       "mask": "Mecklenburg-Vorpommern",
       "min_zoom": 15,
       "max_zoom": 18,
-      "bbox": [53.05, 10.6, 54.69, 14.42],
+      "bbox": [53.05, 10.6, 54.72, 14.42],
       "_comment": "MV Digitale Topographische Karte 1:10000 - LAiV M-V, dl-de/by-2-0"
     },
     "bw_dop": {
@@ -113,7 +113,7 @@
       "layer": "dop10_2025_HB,dop10_2025_BHV",
       "mask": "Bremen",
       "max_zoom": 19,
-      "bbox": [52.95, 8.48, 53.61, 8.99],
+      "bbox": [52.95, 8.48, 53.63, 8.99],
       "_comment": "HB DOP10 2025 (Bremen + Bremerhaven kombiniert) - FHB GeoInformation, dl-de/by-2-0"
     },
     "he_dop": {

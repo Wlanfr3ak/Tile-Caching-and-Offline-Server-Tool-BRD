@@ -376,6 +376,7 @@ class TestRealUpstream(ServerFixture):
 
     def test_real_hb_dop(self):
         self._check_real('hb_dop', 53.075, 8.807)     # Bremen
+        self._check_real('hb_dop', 53.539, 8.580)     # Bremerhaven
 
     def test_real_he_dop(self):
         self._check_real('he_dop', 50.110, 8.682)     # Frankfurt
